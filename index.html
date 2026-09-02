@@ -298,17 +298,26 @@
     }
 
     // Carica il modulo WASM Faust
-    async function loadPedalNode(pedal) {
-      if (!audioCtx) return;
-      try {
-        const module = await import(`${pedal.def.folder}create-node.js`);
-        // Richiama il factory generato da Faust
-        pedal.faustInstance = await module.default(audioCtx, pedal.def.folder);
-        pedal.node = pedal.faustInstance.getAudioNode();
-      } catch (err) {
-        console.error(`Errore caricamento WASM per ${pedal.def.name}:`, err);
-      }
+async function loadPedalNode(pedal) {
+  if (!audioCtx) return;
+  try {
+    const module = await import(`${pedal.def.folder}create-node.js`);
+    
+    // Trova la funzione di creazione esportata (createXNode, createNode o default)
+    const createFn = module.default || 
+                     Object.values(module).find(exp => typeof exp === 'function');
+
+    if (!createFn) {
+      throw new Error(`Nessuna funzione di creazione trovata in ${pedal.def.folder}create-node.js`);
     }
+
+    // Istanzia il pedale Faust
+    pedal.faustInstance = await createFn(audioCtx, pedal.def.folder);
+    pedal.node = pedal.faustInstance.getAudioNode ? pedal.faustInstance.getAudioNode() : pedal.faustInstance;
+  } catch (err) {
+    console.error(`Errore caricamento WASM per ${pedal.def.name}:`, err);
+  }
+}
 
     // Riconnette l'intera catena audio
     function rebuildAudioChain() {

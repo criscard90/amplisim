@@ -39,10 +39,12 @@ self.addEventListener('activate', (event) => {
 
 // Intercettazione richieste (Network First con fallback su Cache)
 self.addEventListener('fetch', (event) => {
+  // Ignora estensioni del browser e schemi non-HTTP
+  if (!event.request.url.startsWith('http')) return;
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Se la risposta è valida, aggiorna la cache dinamicamente (es. per nuovi .wasm caricati)
         if (response && response.status === 200 && response.type === 'basic') {
           const responseToCache = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -51,9 +53,6 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       })
-      .catch(() => {
-        // Se si è offline, recupera dalla cache
-        return caches.match(event.request);
-      })
+      .catch(() => caches.match(event.request))
   );
 });
