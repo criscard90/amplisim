@@ -237,7 +237,7 @@
             ]
         }
         ,
-{
+        {
             id: 'vang2',
             name: 'Vintage Delay',
             category: 'Echo / Delay',
@@ -250,6 +250,16 @@
             { id: 'Mix', label: 'Mix', min:0,max:1,step:0.01,default:0.5 },
             { id: 'Tone', label: 'Tone', min:0,max:1,step:0.01,default:0.6 },
             { id: 'Drive', label: 'Drive', min:0,max:1,step:0.01,default:0.35 }
+            ]
+        },
+        {
+            id: 'cabsim',
+            name: 'IR Cab Loader',
+            category: 'Amplificatore / IR',
+            type: 'ir',
+            irPath: './ir/cab_default.wav',
+            params: [
+            { id: 'Volume', label: 'Volume', min:0,max:2,step:0.01,default:0.8 }
             ]
         }
         ];
@@ -324,16 +334,63 @@
         }
         
         // Carica il modulo WASM Faust
+        // Carica un IR (ConvolverNode) — simulazione di cassa/ampli.
+        // Un IR loader NON usa Faust: usa il nodo nativo ConvolverNode, che convolve un
+        // impulso (.wav) col segnale. Va in serie esattamente come un pedale normale.
+        
+        
+        async function loadIRFromPath(pedal) {
+            if (!audioCtx || !pedal.irNode) return;
+            try {
+                const res = await fetch(pedal.def.irPath);
+                if (!res.ok) return;
+                const buf = await res.arrayBuffer();
+                const decoded = await audioCtx.decodeAudioData(buf);
+                pedal.irNode.buffer = decoded;
+            } catch (err) {
+                console.warn(`Impossibile caricare l'IR da percorso:`, err);
+            }
+        }
+        
+        // Crea i nodi per un pedale IR: la catena termina su gain (Volume);
+        // pedal.irNode = ConvolverNode, pedal.node = GainNode*
+        
+        
+        
+        async function initIRPedal(pedal) {
+            if (!audioCtx) return;
+            const conv = audioCtx.createConvolver();
+            const gain = audioCtx.createGain();
+            const volDef = pedal.def.params.find(p => p.id === 'Volume');
+            gain.gain.value = parseFloat(volDef ? volDef.default : 0.8);
+            conv.connect(gain);
+            pedal.irNode = conv;
+            pedal.node = gain;
+            pedal.faustInstance = null;
+            // Se la registry ha un irPath (file .wav messo dal utente nel repo), lo carica in automatico.
+            
+            
+            
+            if (pedal.def.irPath) {
+                await loadIRFromPath(pedal);
+            }
+        }
+        
         async function loadPedalNode(pedal) {
             if (!audioCtx) return;
+            // Pedale IR: niente Faust, solo ConvolverNode
+            if (pedal.def.type === 'ir') {
+                await initIRPedal(pedal);
+                return;
+            }
             try {
                 const folder = pedal.def.folder.endsWith('/') ? pedal.def.folder : `${pedal.def.folder}/`;
                 // Carichiamo il loader condiviso (js/faust-loader.js) invece di una copia
                 // per-cartella: il loader ├¿ identico per tutti gli effetti.
                 const { createFaustNode } = await import('./js/faust-loader.js');
-
+                
                 if (!createFaustNode) throw new Error("Funzione factory (createFaustNode) non trovata");
-
+                
                 /* Passiamo a createFaustNode la cartella dell'effetto: da l├¼ legge
                 dsp-meta.json, dsp-module.wasm, ecc. e crea il nodo WebAudio puro. */
                 const instance = await createFaustNode(audioCtx, folder, {
@@ -468,6 +525,13 @@
                   oninput="updateParam('${pedal.instanceId}', '${p.id}', this.value)">
               </div>
             `).join('')}
+            ${pedal.def.type === 'ir' ? `
+              <div class="knob-container ir-upload-row">
+                <span class="knob-label">IR (.wav)</span>
+                <label class="ir-btn" style="cursor:pointer;color:var(--accent);border:1px solid var(--glass-border);padding:4px 8px;border-radius:6px;font-size:0.75rem;">Sfoglia<input type="file" class="ir-file" accept=".wav,audio/wav" hidden></label>
+                <span class="ir-name" style="color:var(--text-muted);font-size:0.7rem;">—</span>
+              </div>
+            ` : ''}
           </div>
         `;
                 
@@ -477,11 +541,35 @@
                 slot.addEventListener('dragend', handleDragEnd);
                 
                 pedalboard.appendChild(slot);
+                if (pedal.def.type === 'ir') {
+                    const input = slot.querySelector('.ir-file');
+                    input.addEventListener('change', async (e) => {
+                        const file = e.target.files[0];
+                        if (file && pedal.irNode) {
+                            try {
+                                const buf = await file.arrayBuffer();
+                                const decoded = await audioCtx.decodeAudioData(buf);
+                                pedal.irNode.buffer = decoded;
+                                const nameEl = slot.querySelector('.ir-name');
+                                if (nameEl) nameEl.textContent = file.name;
+                            } catch (err) {
+                                console.error('Errore caricamento IR:', err);
+                            }
+                        }
+                    });
+                }
             });
         }
         
         function updateParam(instanceId, paramId, value) {
             const pedal = activeRig.find(p => p.instanceId === instanceId);
+            // Pedale IR: il "Volume" controlla il gain del ConvolverNode(la catena termina su gain.
+            if (pedal && pedal.def.type === 'ir') {
+                if (paramId === 'Volume' && pedal.node && pedal.node.gain) {
+                    pedal.node.gain.value = parseFloat(value);
+                }
+                return;
+            }
             if (pedal && pedal.faustInstance && typeof pedal.faustInstance.setParamValue === 'function') {
                 // Il prefisso dell'address generato da Faust e& il NOME DSP (dspName),
                 // NON l'id UI della registry (che può essere arbitrario, es. 'rat2').
