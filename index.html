@@ -1054,7 +1054,7 @@
                 updateAudioStatus(false);
             }
         });
-        
+
         // Backup: garantisce resume dell'AudioContext al primo user gesture
         // Necessario su mobile dove l'AudioContext parte sempre in 'suspended'
         const resumeAudioGesture = async () => {
@@ -1065,7 +1065,7 @@
         };
         document.addEventListener('touchstart', resumeAudioGesture, { once: false });
         document.addEventListener('click', resumeAudioGesture, { once: false });
-        
+
         async function initAudio() {
             try {
                 // AudioContext ottimizzato per latenza bassa e compatibilità USB audio:
@@ -1124,7 +1124,7 @@
                     });
                     const audioTracks = stream.getAudioTracks();
                     if (audioTracks.length > 0) {
-                        console.log(`Input attivo: ${audioTracks[0].label} (${audioTracks[0].getSettings().channelCount || 'n/d} canali)`);
+                        console.log(`Input attivo: ${audioTracks[0].label} (${audioTracks[0].getSettings().channelCount || 'n/d'} canali)`);
                     }
                     micStreamNode = audioCtx.createMediaStreamSource(stream);
                 }
@@ -1617,6 +1617,10 @@
             }).join('');
         }
         
+        /* DRAG & DROP HANDLERS STATE */
+        let dragSrcIndex = null;
+        let mousedownInControl = false;
+
         function renderPedalboard() {
             pedalboard.innerHTML = '';
             
@@ -1742,9 +1746,7 @@
             }
         }
         
-        /* DRAG & DROP HANDLERS */
-        let dragSrcIndex = null;
-        let mousedownInControl = false;
+
         
         function handleDragStart(e) {
             // Se il mousedown era partito da un controllo (slider, bottone, upload),
@@ -1781,15 +1783,6 @@
         
         function handleDragEnd() {
             this.classList.remove('dragging');
-        }
-        
-        // Service Worker Registration per PWA
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./service-worker.js')
-                .then(reg => console.log('Service Worker Registrato!', reg))
-                .catch(err => console.error('Errore SW:', err));
-            });
         }
         
         // Avvio
