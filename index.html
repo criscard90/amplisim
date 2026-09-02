@@ -280,9 +280,39 @@
         const statusIndicator = document.getElementById('statusIndicator');
         const statusText = document.getElementById('statusText');
         
+        // FULLSCREEN — richiede interazione utente, quindi lo triggeriamo
+        // al primo click sul pulsante audio (e poi si può attivare/disattivare
+        // in qualsiasi momento con F11 o dal bottone).
+        function toggleFullscreen() {
+            const doc = document.documentElement;
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                if (doc.requestFullscreen) {
+                    doc.requestFullscreen().catch(err => console.warn('Fullscreen negato:', err));
+                } else if (doc.webkitRequestFullscreen) {
+                    doc.webkitRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                }
+            }
+        }
+        
+        // Entra in automatico al primo avvio audio (prima interazione utente reale)
+        let fsTriggered = false;
+        function tryAutoFullscreen() {
+            if (!fsTriggered) {
+                fsTriggered = true;
+                toggleFullscreen();
+            }
+        }
+        
         btnAudioToggle.addEventListener('click', async () => {
             if (!audioCtx) {
                 await initAudio();
+                tryAutoFullscreen();
             } else if (audioCtx.state === 'suspended') {
                 await audioCtx.resume();
                 updateAudioStatus(true);
@@ -551,6 +581,23 @@
                 slot.addEventListener('drop', handleDrop);
                 slot.addEventListener('dragend', handleDragEnd);
                 
+                // Traccia dove è partito il mousedown: se è dentro un controllo,
+                // handleDragStart rifiuterà il drag. Questo copre anche il caso
+                // in cui dragstart parte dallo slot ma il click era sullo slider.
+                slot.addEventListener('mousedown', e => {
+                    mousedownInControl = !!e.target.closest('.pedal-controls, .pedal-actions, .ir-btn, .knob-input, .ir-file, input');
+                });
+                
+                // Blocca il drag start direttamente su slider e file input,
+                // altrimenti l'evento "bubba" verso lo slot (che è draggable=true)
+                // e il browser interpreta lo spostamento dello slider come drag della card.
+                slot.querySelectorAll('.knob-input, .ir-file').forEach(el => {
+                    el.addEventListener('dragstart', e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    });
+                });
+                
                 pedalboard.appendChild(slot);
                 if (pedal.def.type === 'ir') {
                     const input = slot.querySelector('.ir-file');
@@ -601,13 +648,17 @@
         
         /* DRAG & DROP HANDLERS */
         let dragSrcIndex = null;
+        let mousedownInControl = false;
         
         function handleDragStart(e) {
-            // Non avviare il drag se si preme su un controllo (slider[, bottone[, upload)).
-            if (e.target.closest('.pedal-controls, .pedal-actions, .ir-btn')) {
+            // Se il mousedown era partito da un controllo (slider, bottone, upload),
+            // rifiuta il drag — anche se dragstart parte dallo slot (che non è dentro .pedal-controls).
+            if (mousedownInControl || e.target.closest('.pedal-controls, .pedal-actions, .ir-btn, .knob-input, .ir-file, input')) {
                 e.preventDefault();
+                mousedownInControl = false;
                 return;
             }
+            mousedownInControl = false;
             dragSrcIndex = Number(this.dataset.index);
             this.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
