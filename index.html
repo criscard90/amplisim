@@ -258,33 +258,23 @@
         
         async function initAudio() {
             try {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+                // Lasciamo che sia il browser a decidere la sample rate nativa
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 
-                // Tenta di disattivare i filtri, se fallisce passa al fallback audio: true
-                let stream;
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({
-                        audio: {
-                            echoCancellation: false,
-                            noiseSuppression: false,
-                            autoGainControl: false
-                        }
-                    });
-                } catch (e) {
-                    // Fallback base universalmente supportato da qualsiasi dispositivo/browser
-                    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                }
-                
+                // Inizializzazione stream microfono identica a quella generata da Faust
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 micStreamNode = audioCtx.createMediaStreamSource(stream);
+                
                 updateAudioStatus(true);
                 
+                // Carichiamo i nodi dei pedali
                 for (let pedal of activeRig) {
                     if (!pedal.node) await loadPedalNode(pedal);
                 }
                 
                 rebuildAudioChain();
             } catch (err) {
-                alert("Impossibile accedere all'input audio: " + err.message);
+                alert("Errore nell'attivazione dell'audio: " + err.message);
             }
         }
         
@@ -306,19 +296,24 @@
         async function loadPedalNode(pedal) {
             if (!audioCtx) return;
             try {
-                const module = await import(`${pedal.def.folder}create-node.js`);
+                // Importiamo l'entrypoint originale esportato da Faust (index.js o create-node.js)
+                const module = await import(`${pedal.def.folder}index.js`);
                 
-                // Trova la funzione di creazione esportata (createXNode, createNode o default)
-                const createFn = module.default || 
-                Object.values(module).find(exp => typeof exp === 'function');
-                
-                if (!createFn) {
-                    throw new Error(`Nessuna funzione di creazione trovata in ${pedal.def.folder}create-node.js`);
+                // In Faust l'inizializzazione standard crea la factory passando audioCtx e il path
+                // Se index.js esporta la classe del DSP o il factory:
+                if (module.default) {
+                    const dspFactory = new module.default(audioCtx, pedal.def.folder);
+                    pedal.faustInstance = await dspFactory.load();
+                    pedal.node = pedal.faustInstance.getAudioNode();
+                } else {
+                    // Fallback per create-node.js nativo
+                    const createModule = await import(`${pedal.def.folder}create-node.js`);
+                    const createFn = Object.values(createModule).find(exp => typeof exp === 'function');
+                    
+                    // Passiamo solo audioCtx e folder senza vincoli extra
+                    pedal.node = await createFn(audioCtx, pedal.def.folder);
+                    pedal.faustInstance = pedal.node;
                 }
-                
-                // Istanzia il pedale Faust
-                pedal.faustInstance = await createFn(audioCtx, pedal.def.folder);
-                pedal.node = pedal.faustInstance.getAudioNode ? pedal.faustInstance.getAudioNode() : pedal.faustInstance;
             } catch (err) {
                 console.error(`Errore caricamento WASM per ${pedal.def.name}:`, err);
             }
