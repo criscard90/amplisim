@@ -301,27 +301,35 @@
                 const folder = pedal.def.folder.endsWith('/') ? pedal.def.folder : `${pedal.def.folder}/`;
                 const module = await import(`${folder}create-node.js`);
                 
-                // Troviamo la funzione di creazione
-                const createFn = module.default || Object.values(module).find(exp => typeof exp === 'function');
+                // Troviamo la funzione di creazione.
+                // IMPORTANTE: NON usare Object.values(module).find(...) come fallback euristico:
+                // gli export dei moduli ES sono enumerati in ordine alfabetico, pertanto verrebbe
+                // selezionata 'connectToAudioInput' (che non ha return) invece di 'createFaustNode'.
+                const createFn = module.createFaustNode || module.default;
                 
-                if (!createFn) throw new Error("Funzione factory non trovata");
+                if (!createFn) throw new Error("Funzione factory (createFaustNode) non trovata");
                 
                 /* IMPORTANTE: Passiamo 'folder' e disattiviamo l'input interno di Faust.
                 Molti script esportati da Faust accettano i parametri: (audioContext, bufferSize/path)
                 oppure restituiscono direttamente il nodo AudioWorklet senza collegare il microfono.
                 */
+                // createFaustNode restituisce { faustNode, dspMeta }
                 const instance = await createFn(audioCtx, folder);
                 
                 // Se la funzione ha creato autonomamente un microfono interno, lo colleghiamo al nostro contesto
                 pedal.faustInstance = instance;
                 
                 // Estraiamo solo il nodo WebAudio puro (senza lo stream microfonico di Faust)
-                if (instance.getAudioNode) {
+                if (instance && instance.faustNode) {
+                    pedal.node = instance.faustNode;
+                } else if (instance && instance.getAudioNode) {
                     pedal.node = instance.getAudioNode();
                 } else if (instance instanceof AudioNode) {
                     pedal.node = instance;
+                } else if (instance && instance.node) {
+                    pedal.node = instance.node;
                 } else {
-                    pedal.node = instance.node || instance;
+                    pedal.node = instance;
                 }
                 
             } catch (err) {
