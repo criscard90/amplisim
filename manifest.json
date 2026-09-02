@@ -1,16 +1,16 @@
 {
-  "name": "Faust proco_rat_2",
-  "short_name": "proco_rat_2",
+  "name": "AmpRig WebStudio",
+  "short_name": "AmpRig",
+  "description": "Simulatore di amplificatori ed effetti per chitarra via WebAudio e WASM",
   "start_url": "./index.html",
-  "description": "Progressive Web App for proco_rat_2",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
-  "orientation": "portrait",
+  "orientation": "landscape",
+  "background_color": "#060411",
+  "theme_color": "#0f0c20",
   "icons": [
     {
-      "src": "./icon.png",
-      "sizes": "390x390",
+      "src": "guitar.png",
+      "sizes": "512x512",
       "type": "image/png"
     }
   ]

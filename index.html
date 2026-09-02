@@ -1,76 +1,485 @@
 <!DOCTYPE html>
-<html lang="en">
-
-<link rel="manifest" href="./manifest.json">
-
+<html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Faust DSP</title>
+    <title>AmpRig WebStudio</title>
+    <link rel="manifest" href="manifest.json">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f0c20 0%, #15102a 50%, #060411 100%);
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --glass-blur: blur(16px);
+            --accent: #ff5e36;
+            --accent-glow: rgba(255, 94, 54, 0.4);
+            --text-main: #f0f0f8;
+            --text-muted: #8a8a9e;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; user-select: none; }
+        
         body {
-            color: #b0b0b0;
-            background-color: #1f1f1f;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
             display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+        
+        /* TOP BAR / HEADER */
+        header {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
             top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            position: absolute;
+            z-index: 100;
         }
-
+        
+        .brand { display: flex; align-items: center; gap: 12px; }
+        .brand i { font-size: 1.5rem; color: var(--accent); text-shadow: 0 0 10px var(--accent-glow); }
+        .brand h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: 0.5px; }
+        
+        .controls-master { display: flex; align-items: center; gap: 16px; }
+        
+        .btn {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            backdrop-filter: var(--glass-blur);
+        }
+        
+        .btn:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.25); }
+        .btn-accent { background: var(--accent); border: none; box-shadow: 0 4px 15px var(--accent-glow); }
+        .btn-accent:hover { background: #ff7350; transform: translateY(-1px); }
+        .btn-accent.active { background: #00e676; box-shadow: 0 4px 15px rgba(0, 230, 118, 0.4); }
+        
+        /* LAYOUT PRINCIPALE */
         main {
-            margin: 20px;
-            display: flex;
-            flex-direction: column;
-            flex: 1 1 100%;
-        }
-
-        main span {
-            position: relative;
-            display: flex;
-        }
-
-        main span[hidden] {
-            display: none;
-        }
-
-        main span span {
-            margin: 0px 10px;
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 24px;
+            padding: 24px;
             flex: 1;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
         }
-
-        main span select {
-            flex: 2;
-        }
-
-        #dsp-switch {
-            margin: 20px auto;
-        }
-
-        #button-dsp {
-            padding: 10px;
-        }
-
-        #div-faust-ui {
-            flex: 1 1 auto;
+        
+        /* LIBRERIA EFFETTI (SIDEBAR) */
+        .sidebar {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 20px;
             display: flex;
-            position: relative;
             flex-direction: column;
-            color: black;
+            gap: 16px;
         }
+        
+        .sidebar h2 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+        
+        .effects-catalog { display: flex; flex-direction: column; gap: 12px; }
+        
+        .effect-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            padding: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .effect-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--accent);
+            transform: translateX(4px);
+        }
+        
+        .effect-info h3 { font-size: 0.95rem; font-weight: 600; }
+        .effect-info p { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+        
+        /* CATENA RIG (PEDALBOARD) */
+        .rig-container {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .rig-header { display: flex; justify-content: space-between; align-items: center; }
+        
+        .pedalboard {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            overflow-x: auto;
+            padding-bottom: 16px;
+            min-height: 380px;
+        }
+        
+        /* SINGOLO PEDALE NELLA CATENA */
+        .pedal-slot {
+            background: rgba(20, 18, 35, 0.6);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            width: 220px;
+            min-width: 220px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+        
+        .pedal-slot.dragging { opacity: 0.4; transform: scale(0.95); }
+        
+        .pedal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 8px;
+        }
+        
+        .pedal-title { font-size: 0.9rem; font-weight: 700; color: var(--accent); }
+        .pedal-actions { display: flex; gap: 8px; }
+        .pedal-actions i { cursor: pointer; color: var(--text-muted); font-size: 0.85rem; transition: color 0.2s; }
+        .pedal-actions i:hover { color: #ff5252; }
+        
+        /* KNOBS / CONTROLLI */
+        .knob-container { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 8px; }
+        .knob-label { font-size: 0.75rem; color: var(--text-muted); }
+        .knob-input { width: 100%; accent-color: var(--accent); cursor: pointer; }
+        
+        /* FOOTER / STATUS */
+        .status-bar {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .status-indicator { width: 8px; height: 8px; border-radius: 50%; background: #ff5252; }
+        .status-indicator.active { background: #00e676; box-shadow: 0 0 8px #00e676; }
     </style>
-    <link rel="stylesheet" href="./faust-ui/index.css">
 </head>
-
 <body>
-    <main>
-        <div id="div-faust-ui">
+    
+    <header>
+        <div class="brand">
+            <i class="fa-solid fa-guitar"></i>
+            <h1>AmpRig Studio</h1>
         </div>
+        <div class="controls-master">
+            <div class="status-bar">
+                <div id="statusIndicator" class="status-indicator"></div>
+                <span id="statusText">M-Audio Disconnessa</span>
+            </div>
+            <button id="btnAudioToggle" class="btn btn-accent">
+                <i class="fa-solid fa-power-off"></i> Attiva Audio
+            </button>
+        </div>
+    </header>
+    
+    <main>
+        <aside class="sidebar">
+            <h2>Libreria Effetti</h2>
+            <div id="catalogList" class="effects-catalog">
+            </div>
+        </aside>
+        
+        <section class="rig-container">
+            <div class="rig-header">
+                <h2>Catena Audio Real-Time</h2>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">Trascina per riordinare gli effetti</span>
+            </div>
+            
+            <div id="pedalboard" class="pedalboard">
+            </div>
+        </section>
     </main>
-    <script src="./index.js"></script>
+    
+    <script>
+        /* ========================================================================
+        1. REGISTRO EFFETTI (Come aggiungere facilmente nuovi pedali)
+        ========================================================================
+        Per aggiungere un effetto sviluppato in Faust:
+        1. Esporta l'effetto in WASM da Faust IDE.
+        2. Crea una cartella in 'effects/NOME/' e metti i file .wasm e .js
+        3. Aggiungi un oggetto a questo array.
+        */
+        const EFFECTS_REGISTRY = [
+        {
+            id: 'proco_rat',
+            name: 'ProCo Rat II',
+            category: 'Distortion',
+            folder: './effects/rat/',
+            params: [
+            { id: 'Distortion', label: 'Distortion', min: 0, max: 1, step: 0.01, default: 0.5 },
+            { id: 'Filter', label: 'Filter', min: 0, max: 1, step: 0.01, default: 0.5 },
+            { id: 'Volume', label: 'Volume', min: 0, max: 1, step: 0.01, default: 0.7 }
+            ]
+        },
+        {
+            id: 'simple_delay',
+            name: 'Echo Delay',
+            category: 'Delay',
+            folder: './effects/delay/',
+            params: [
+            { id: 'Time', label: 'Time (ms)', min: 10, max: 1000, step: 1, default: 350 },
+            { id: 'Feedback', label: 'Feedback', min: 0, max: 0.9, step: 0.01, default: 0.4 }
+            ]
+        }
+        ];
+        
+        /* ========================================================================
+        2. GESTIONE AUDIOCONTEXT & ROUTING ENGINE
+        ======================================================================== */
+        let audioCtx = null;
+        let micStreamNode = null;
+        let activeRig = []; // Array dei pedali attivi nella catena
+        
+        const btnAudioToggle = document.getElementById('btnAudioToggle');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        
+        btnAudioToggle.addEventListener('click', async () => {
+            if (!audioCtx) {
+                await initAudio();
+            } else if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+                updateAudioStatus(true);
+            } else {
+                await audioCtx.suspend();
+                updateAudioStatus(false);
+            }
+        });
+        
+        async function initAudio() {
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+                
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false,
+                        latency: 0
+                    }
+                });
+                
+                micStreamNode = audioCtx.createMediaStreamSource(stream);
+                updateAudioStatus(true);
+                rebuildAudioChain();
+            } catch (err) {
+                alert("Errore nell'accesso alla scheda M-Audio: " + err.message);
+            }
+        }
+        
+        function updateAudioStatus(isActive) {
+            if (isActive) {
+                statusIndicator.classList.add('active');
+                statusText.innerText = "Audio Attivo (M-Audio OTG)";
+                btnAudioToggle.classList.add('active');
+                btnAudioToggle.innerHTML = `<i class="fa-solid fa-power-off"></i> Audio ON`;
+            } else {
+                statusIndicator.classList.remove('active');
+                statusText.innerText = "Audio In Pausa";
+                btnAudioToggle.classList.remove('active');
+                btnAudioToggle.innerHTML = `<i class="fa-solid fa-power-off"></i> Attiva Audio`;
+            }
+        }
+        
+        /* Ricollega fisicamente la catena dei nodi WebAudio */
+        function rebuildAudioChain() {
+            if (!audioCtx || !micStreamNode) return;
+            
+            // Scollega tutto
+            micStreamNode.disconnect();
+            activeRig.forEach(pedal => {
+                if (pedal.node) pedal.node.disconnect();
+            });
+            
+            // Ricollega in serie
+            let currentSource = micStreamNode;
+            
+            activeRig.forEach(pedal => {
+                if (pedal.node) {
+                    currentSource.connect(pedal.node);
+                    currentSource = pedal.node;
+                }
+            });
+            
+            // Collega l'ultimo elemento alle cuffie/speaker
+            currentSource.connect(audioCtx.destination);
+        }
+        
+        /* ========================================================================
+        3. INTERFACCIA UTENTE & DRAG AND DROP
+        ======================================================================== */
+        const catalogList = document.getElementById('catalogList');
+        const pedalboard = document.getElementById('pedalboard');
+        
+        // Popola Catalogo SideBar
+        function renderCatalog() {
+            catalogList.innerHTML = '';
+            EFFECTS_REGISTRY.forEach(effect => {
+                const card = document.createElement('div');
+                card.className = 'effect-card';
+                card.innerHTML = `
+          <div class="effect-info">
+            <h3>${effect.name}</h3>
+            <p>${effect.category}</p>
+          </div>
+          <i class="fa-solid fa-plus-circle" style="color: var(--accent)"></i>
+        `;
+                card.onclick = () => addEffectToRig(effect);
+                catalogList.appendChild(card);
+            });
+        }
+        
+        // Aggiunge un pedale alla catena
+        function addEffectToRig(effectDef) {
+            const instanceId = 'pedal_' + Date.now();
+            const pedalData = {
+                instanceId,
+                def: effectDef,
+                node: null // Il WebAudio Node verrà agganciato qui
+            };
+            
+            activeRig.push(pedalData);
+            renderPedalboard();
+            rebuildAudioChain();
+        }
+        
+        // Rimuove un pedale
+        function removePedal(instanceId) {
+            activeRig = activeRig.filter(p => p.instanceId !== instanceId);
+            renderPedalboard();
+            rebuildAudioChain();
+        }
+        
+        // Renderizza la Pedaliera GUI
+        function renderPedalboard() {
+            pedalboard.innerHTML = '';
+            
+            activeRig.forEach((pedal, index) => {
+                const slot = document.createElement('div');
+                slot.className = 'pedal-slot';
+                slot.draggable = true;
+                slot.dataset.index = index;
+                
+                slot.innerHTML = `
+          <div class="pedal-header">
+            <span class="pedal-title">${pedal.def.name}</span>
+            <div class="pedal-actions">
+              <i class="fa-solid fa-trash" onclick="removePedal('${pedal.instanceId}')"></i>
+            </div>
+          </div>
+          <div class="pedal-controls">
+            ${pedal.def.params.map(p => `
+              <div class="knob-container">
+                <span class="knob-label">${p.label}</span>
+                <input type="range" class="knob-input" 
+                  min="${p.min}" max="${p.max}" step="${p.step}" value="${p.default}"
+                  oninput="updateParam('${pedal.instanceId}', '${p.id}', this.value)">
+              </div>
+            `).join('')}
+          </div>
+        `;
+                
+                // Eventi Drag & Drop per riordinare
+                slot.addEventListener('dragstart', handleDragStart);
+                slot.addEventListener('dragover', handleDragOver);
+                slot.addEventListener('drop', handleDrop);
+                slot.addEventListener('dragend', handleDragEnd);
+                
+                pedalboard.appendChild(slot);
+            });
+        }
+        
+        // Gestione parametri
+        function updateParam(instanceId, paramId, value) {
+            const pedal = activeRig.find(p => p.instanceId === instanceId);
+            if (pedal && pedal.node) {
+                // Sintassi aggiornamento param Faust: pedal.node.setParamValue('/Path/Param', value)
+                console.log(`Aggiorno ${paramId} a ${value}`);
+            }
+        }
+        
+        /* DRAG AND DROP LOGIC */
+        let dragSrcIndex = null;
+        
+        function handleDragStart(e) {
+            dragSrcIndex = Number(this.dataset.index);
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+        
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+        
+        function handleDrop(e) {
+            e.stopPropagation();
+            const targetIndex = Number(this.dataset.index);
+            
+            if (dragSrcIndex !== null && dragSrcIndex !== targetIndex) {
+                // Scambia gli elementi nell'array activeRig
+                const movedPedal = activeRig.splice(dragSrcIndex, 1)[0];
+                activeRig.splice(targetIndex, 0, movedPedal);
+                
+                renderPedalboard();
+                rebuildAudioChain();
+            }
+            return false;
+        }
+        
+        function handleDragEnd() {
+            this.classList.remove('dragging');
+        }
+        
+        // Init
+        renderCatalog();
+        
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                .then(reg => console.log('Service Worker registrato con successo!', reg))
+                .catch(err => console.error('Errore registrazione Service Worker:', err));
+            });
+        }
+    </script>
 </body>
-
 </html>
