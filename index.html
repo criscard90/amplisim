@@ -921,20 +921,6 @@
             rebuildAudioChain();
         }
         
-        // PRESET SYSTEM — localStorage
-        const PRESETS_STORAGE_KEY = 'ampRigPresets';
-        
-        function getPresets() {
-            try { return JSON.parse(localStorage.getItem(PRESETS_STORAGE_KEY)) || []; }
-            catch { return []; }
-        }
-        
-        function setPresets(presets) {
-            localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
-        }
-        
-        }
-        
         // PRESET SYSTEM — Save & recall rig configurations via localStorage
         const PRESETS_STORAGE_KEY = 'ampRigPresets';
         
