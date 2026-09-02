@@ -8,6 +8,7 @@
     <link rel="manifest" href="manifest.json">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/faustwasm@latest/dist/index.js"></script>
     
     <style>
         :root {
@@ -296,23 +297,32 @@
         async function loadPedalNode(pedal) {
             if (!audioCtx) return;
             try {
-                // Importiamo l'entrypoint originale esportato da Faust (index.js o create-node.js)
-                const module = await import(`${pedal.def.folder}index.js`);
+                // 1. Carichiamo i metadati e il binario WASM dalla cartella specifica del pedale
+                const metaReq = await fetch(`${pedal.def.folder}dsp-meta.json`);
+                const dspMeta = await metaReq.json();
                 
-                // In Faust l'inizializzazione standard crea la factory passando audioCtx e il path
-                // Se index.js esporta la classe del DSP o il factory:
-                if (module.default) {
-                    const dspFactory = new module.default(audioCtx, pedal.def.folder);
-                    pedal.faustInstance = await dspFactory.load();
-                    pedal.node = pedal.faustInstance.getAudioNode();
-                } else {
-                    // Fallback per create-node.js nativo
-                    const createModule = await import(`${pedal.def.folder}create-node.js`);
-                    const createFn = Object.values(createModule).find(exp => typeof exp === 'function');
-                    
-                    // Passiamo solo audioCtx e folder senza vincoli extra
-                    pedal.node = await createFn(audioCtx, pedal.def.folder);
+                const wasmReq = await fetch(`${pedal.def.folder}dsp-module.wasm`);
+                const wasmBuffer = await wasmReq.arrayBuffer();
+                
+                // 2. Istanziamo il nodo Faust tramite la libreria globale
+                const { FaustMonoWebAudioDsp } = window.faustwasm || {};
+                
+                // Se la libreria CDN è presente, creiamo il nodo in modo pulito
+                if (window.faustwasm) {
+                    const compiler = new faustwasm.FaustCompiler();
+                    // Inizializzazione diretta tramite FaustWasm SDK
+                    const factory = await faustwasm.createMonoNodeFactory(audioCtx, "rat2", wasmBuffer);
+                    pedal.node = factory.createNode(audioCtx);
                     pedal.faustInstance = pedal.node;
+                } else {
+                    // Fallback: carica lo script locale passando il percorso base corretto
+                    const module = await import(`${pedal.def.folder}create-node.js`);
+                    const createFn = module.default || Object.values(module).find(exp => typeof exp === 'function');
+                    
+                    // Forziamo il percorso della cartella termina con '/'
+                    const folderPath = pedal.def.folder.endsWith('/') ? pedal.def.folder : pedal.def.folder + '/';
+                    pedal.faustInstance = await createFn(audioCtx, folderPath);
+                    pedal.node = pedal.faustInstance.getAudioNode ? pedal.faustInstance.getAudioNode() : pedal.faustInstance;
                 }
             } catch (err) {
                 console.error(`Errore caricamento WASM per ${pedal.def.name}:`, err);
