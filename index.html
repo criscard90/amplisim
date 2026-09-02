@@ -1055,31 +1055,77 @@
             }
         });
         
+        // Backup: garantisce resume dell'AudioContext al primo user gesture
+        // Necessario su mobile dove l'AudioContext parte sempre in 'suspended'
+        const resumeAudioGesture = async () => {
+            if (audioCtx && audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+                console.log('AudioContext ripreso dopo user gesture');
+            }
+        };
+        document.addEventListener('touchstart', resumeAudioGesture, { once: false });
+        document.addEventListener('click', resumeAudioGesture, { once: false });
+        
         async function initAudio() {
             try {
-                // Inizializza l'AudioContext senza latencyHint rigidi
+                // AudioContext ottimizzato per latenza bassa e compatibilità USB audio:
+                // - latencyHint: 'interactive' richiede ~5ms (vs ~48ms di default su mobile)
+                // - sampleRate: 48000 match con la maggior parte delle schede USB (M-Audio, Focusrite, iRig)
                 if (!audioCtx) {
-                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)({
+                        latencyHint: 'interactive',
+                        sampleRate: 48000
+                    });
+                    console.log(`AudioContext creato: sampleRate=${audioCtx.sampleRate}Hz, baseLatency=${audioCtx.baseLatency}s`);
                 }
                 
                 if (audioCtx.state === 'suspended') {
                     await audioCtx.resume();
                 }
                 
-                // Microfono con vincoli per ridurre il rumore di fondo a monte:
-                // - noiseSuppression: taglia il fruscio stazionario del microfono (fondamentale
-                //   PRIMA di un distortore, che amplificherebbe il rumorerizona);
-                // - autoGainControl: off, per non far pompare al browser il gain in automatico
-                //   (altrimenti il distortore diventa imprevedibile e il noise sfugge di mano);
-                // - echoCancellation: concentrato a off per coerenza (cuffie, nessun eco).
+                // Tentativo di routing output su scheda USB se disponibile
+                // (supportato su Chrome Android, non su Safari iOS)
+                if (audioCtx.setSinkId) {
+                    try {
+                        const devices = await navigator.mediaDevices.enumerateDevices();
+                        const usbOutput = devices.find(d =>
+                            d.kind === 'audiooutput' &&
+                            (d.label.toLowerCase().includes('usb') ||
+                             d.label.toLowerCase().includes('maudio') ||
+                             d.label.toLowerCase().includes('m-audio') ||
+                             d.label.toLowerCase().includes('focusrite') ||
+                             d.label.toLowerCase().includes('irig'))
+                        );
+                        if (usbOutput) {
+                            await audioCtx.setSinkId(usbOutput.deviceId);
+                            console.log(`Output routing: ${usbOutput.label}`);
+                        } else {
+                            console.log('Nessun dispositivo USB trovato, uso output di default');
+                        }
+                    } catch (sinkErr) {
+                        console.warn('setSinkId non supportato o fallito:', sinkErr);
+                    }
+                }
+                
+                // Microfono con vincoli MINIMI per compatibilità con schede USB:
+                // - noiseSuppression: OFF — FONDAMENTALE! Blocca il segnale Hi-Z delle chitarre
+                //   su interfacce USB professionali (il browser interpreta il segnale come rumore)
+                // - autoGainControl: off, per non pompare gain in automatico (distorsore imprevedibile)
+                // - echoCancellation: off, nessun eco con cuffie/scheda diretta
+                // - channelCount: 1, mono come il segnale della chitarra
                 if (!micStreamNode) {
                     const stream = await navigator.mediaDevices.getUserMedia({
                         audio: {
                             echoCancellation: false,
-                            noiseSuppression: true,
-                            autoGainControl: false
+                            noiseSuppression: false,
+                            autoGainControl: false,
+                            channelCount: 1
                         }
                     });
+                    const audioTracks = stream.getAudioTracks();
+                    if (audioTracks.length > 0) {
+                        console.log(`Input attivo: ${audioTracks[0].label} (${audioTracks[0].getSettings().channelCount || 'n/d} canali)`);
+                    }
                     micStreamNode = audioCtx.createMediaStreamSource(stream);
                 }
                 
