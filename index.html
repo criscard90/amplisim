@@ -870,6 +870,30 @@
     </button>
     
     <script>
+        // Auto-update: rileva nuovi service worker e forza il refresh
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./service-worker.js').then(reg => {
+                // Controlla aggiornamenti ogni minuto
+                setInterval(() => reg.update(), 60000);
+                
+                // Se c'è un nuovo SW in attesa
+                reg.addEventListener('updatefound', () => {
+                    const newWorker = reg.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        // Quando il nuovo SW è installato e in attesa
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // Forza il nuovo SW a prendere il controllo
+                            newWorker.postMessage({ type: 'SKIP_WAITING' });
+                        }
+                    });
+                });
+                
+                // Quando il nuovo SW prende il controllo, ricarica la pagina
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    window.location.reload();
+                });
+            });
+        }
         // 1. REGISTRO EFFETTI DISPONIBILI
         const EFFECTS_REGISTRY = [
         {
