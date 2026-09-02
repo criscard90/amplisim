@@ -158,6 +158,10 @@
         }
         
         .pedal-slot.dragging { opacity: 0.4; transform: scale(0.95); }
+        .pedal-slot.collapsed .pedal-controls { display: none; }
+        .pedal-icone { color: var(--accent); font-size: 0.9rem; cursor: default; }
+        .pedal-actions i.pedal-collapse:hover { color: var(--accent); }
+        .effect-icon { color: var(--accent); font-size: 0.9rem; margin-bottom: 4px; }
         
         .pedal-header {
             display: flex;
@@ -226,6 +230,7 @@
         {
             id: 'rat2',
             name: 'ProCo Rat II',
+            icon: 'fa-solid fa-bolt',
             category: 'Distortion',
             folder: './effects/proco_rat_2/',
             dspName: 'proco_rat_2',
@@ -240,6 +245,7 @@
         {
             id: 'vang2',
             name: 'Vintage Delay',
+            icon: 'fa-solid fa-clock',
             category: 'Echo / Delay',
             folder: './effects/vintage_delay_2/',
             dspName: 'vintage_delay_2',
@@ -255,6 +261,7 @@
         {
             id: 'cabsim',
             name: 'IR Cab Loader',
+            icon: 'fa-solid fa-tower-broadcast',
             category: 'Amplificatore / IR',
             type: 'ir',
             irPath: './ir/cab_default.wav',
@@ -456,6 +463,7 @@
                 card.className = 'effect-card';
                 card.innerHTML = `
           <div class="effect-info">
+            <i class="effect-icon ${effect.icon || 'fa-solid fa-drum'}"></i>
             <h3>${effect.name}</h3>
             <p>${effect.category}</p>
           </div>
@@ -508,19 +516,22 @@
                 slot.className = 'pedal-slot';
                 slot.draggable = true;
                 slot.dataset.index = index;
+                slot.dataset.instance = pedal.instanceId;
                 
                 slot.innerHTML = `
           <div class="pedal-header">
+            <i class="pedal-icone ${pedal.def.icon || 'fa-solid fa-drum'}"></i>
             <span class="pedal-title">${pedal.def.name}</span>
             <div class="pedal-actions">
-              <i class="fa-solid fa-trash" onclick="removePedal('${pedal.instanceId}')"></i>
+              <i class="fa-solid fa-chevron-up pedal-collapse" draggable="false" onclick="toggleCollapse('${pedal.instanceId}')"></i>
+              <i class="fa-solid fa-trash" draggable="false" onclick="removePedal('${pedal.instanceId}')"></i>
             </div>
           </div>
           <div class="pedal-controls">
             ${pedal.def.params.map(p => `
               <div class="knob-container">
                 <span class="knob-label">${p.label}</span>
-                <input type="range" class="knob-input" 
+                <input type="range" class="knob-input" draggable="false" 
                   min="${p.min}" max="${p.max}" step="${p.step}" value="${p.default}"
                   oninput="updateParam('${pedal.instanceId}', '${p.id}', this.value)">
               </div>
@@ -528,7 +539,7 @@
             ${pedal.def.type === 'ir' ? `
               <div class="knob-container ir-upload-row">
                 <span class="knob-label">IR (.wav)</span>
-                <label class="ir-btn" style="cursor:pointer;color:var(--accent);border:1px solid var(--glass-border);padding:4px 8px;border-radius:6px;font-size:0.75rem;">Sfoglia<input type="file" class="ir-file" accept=".wav,audio/wav" hidden></label>
+                <label class="ir-btn" draggable="false" style="cursor:pointer;color:var(--accent);border:1px solid var(--glass-border);padding:4px 8px;border-radius:6px;font-size:0.75rem;">Sfoglia<input type="file" class="ir-file" accept=".wav,audio/wav" hidden></label>
                 <span class="ir-name" style="color:var(--text-muted);font-size:0.7rem;">—</span>
               </div>
             ` : ''}
@@ -561,6 +572,15 @@
             });
         }
         
+        function toggleCollapse(instanceId) {
+            const slot = document.querySelector(`.pedal-slot[data-instance="${instanceId}"]`);
+            if (slot) {
+                slot.classList.toggle('collapsed');
+                const ic = slot.querySelector('.pedal-collapse');
+                if (ic) ic.classList.toggle('fa-chevron-down');
+            }
+        }
+
         function updateParam(instanceId, paramId, value) {
             const pedal = activeRig.find(p => p.instanceId === instanceId);
             // Pedale IR: il "Volume" controlla il gain del ConvolverNode(la catena termina su gain.
@@ -583,6 +603,11 @@
         let dragSrcIndex = null;
         
         function handleDragStart(e) {
+            // Non avviare il drag se si preme su un controllo (slider[, bottone[, upload)).
+            if (e.target.closest('.pedal-controls, .pedal-actions, .ir-btn')) {
+                e.preventDefault();
+                return;
+            }
             dragSrcIndex = Number(this.dataset.index);
             this.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
