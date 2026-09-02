@@ -160,6 +160,26 @@
             background-repeat: no-repeat;
         }
         
+        /* Overlay scuro sopra l'immagine di sfondo per leggibilità testo */
+        .pedal-slot::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 12, 30, 0.72);
+            border-radius: 16px;
+            z-index: 0;
+            transition: background 0.2s ease;
+        }
+        
+        .pedal-slot.collapsed::before {
+            background: rgba(15, 12, 30, 0.82);
+        }
+        
+        .pedal-slot > * {
+            position: relative;
+            z-index: 1;
+        }
+        
         /* Quando il pedale è ridotto, mostra l'immagine "collapsed" */
         .pedal-slot.collapsed {
             background-image: var(--bg-collapsed) !important;
@@ -201,6 +221,114 @@
         
         .status-indicator { width: 8px; height: 8px; border-radius: 50%; background: #ff5252; }
         .status-indicator.active { background: #00e676; box-shadow: 0 0 8px #00e676; }
+        
+        /* Custom confirm modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(6, 4, 17, 0.75);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: modalFadeIn 0.2s ease;
+        }
+        
+        .modal-overlay.show {
+            display: flex;
+        }
+        
+        @keyframes modalFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-dialog {
+            background: linear-gradient(135deg, rgba(25, 22, 45, 0.95) 0%, rgba(18, 15, 35, 0.98) 100%);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 28px 32px;
+            max-width: 380px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px var(--accent-glow);
+            animation: modalSlideIn 0.25s ease;
+        }
+        
+        @keyframes modalSlideIn {
+            from { transform: translateY(-20px) scale(0.95); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        
+        .modal-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: rgba(255, 94, 54, 0.15);
+            border: 1px solid rgba(255, 94, 54, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+        
+        .modal-icon i {
+            font-size: 1.3rem;
+            color: var(--accent);
+        }
+        
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 8px;
+        }
+        
+        .modal-message {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        
+        .btn-modal {
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid var(--glass-border);
+            font-family: inherit;
+        }
+        
+        .btn-modal-cancel {
+            background: var(--glass-bg);
+            color: var(--text-main);
+        }
+        
+        .btn-modal-cancel:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+        
+        .btn-modal-confirm {
+            background: var(--accent);
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 4px 15px var(--accent-glow);
+        }
+        
+        .btn-modal-confirm:hover {
+            background: #ff7350;
+            transform: translateY(-1px);
+        }
     </style>
 </head>
 <body>
@@ -247,8 +375,8 @@
             folder: './effects/proco_rat_2/',
             dspName: 'proco_rat_2',
             voices: 0,
-            bgExpanded: 'url(https://placehold.co/220x340/1a1530/ff5e36?text=Distorsion)',
-            bgCollapsed: 'url(https://placehold.co/220x80/1a1530/ff5e36?text=Distorsion)',
+            bgExpanded: '/pedal_images/expanded/distorsion.png',
+            bgCollapsed: '/pedal_images/collapsed/distorsion.png',
             params: [
             { id: 'Distortion', label: 'Distortion', min: 0, max: 1, step: 0.01, default: 0.5 },
             { id: 'Filter', label: 'Filter', min: 0, max: 1, step: 0.01, default: 0.5 },
@@ -264,8 +392,8 @@
             folder: './effects/vintage_delay_2/',
             dspName: 'vintage_delay_2',
             voices: 0,
-            bgExpanded: 'url(https://placehold.co/220x340/1a1530/ff5e36?text=Delay)',
-            bgCollapsed: 'url(https://placehold.co/220x80/1a1530/ff5e36?text=Delay)',
+            bgExpanded: '/pedal_images/expanded/delay.png',
+            bgCollapsed: '/pedal_images/collapsed/delay.png',
             params: [
             { id: 'Time', label: 'Time (ms)', min:20,max:2000,step:1,default:300 },
             { id: 'Feedback', label: 'Feedback', min:0,max:0.95,step:0.01,default:0.45 },
@@ -282,8 +410,8 @@
             folder: './effects/tremolo/',
             dspName: 'tremolo',
             voices: 0,
-            bgExpanded: 'url(https://placehold.co/220x340/1a1530/ff5e36?text=Tremolo)',
-            bgCollapsed: 'url(https://placehold.co/220x80/1a1530/ff5e36?text=Tremolo)',
+            bgExpanded: '/pedal_images/expanded/tremolo.png',
+            bgCollapsed: '/pedal_images/collapsed/tremolo.png',
             params: [
             { id: 'Rate', label: 'Rate', min:0.1,max:20,step:0.01,default:4 },
             { id: 'Depth', label: 'Depth', min:0,max:1,step:0.01,default:0.7 },
@@ -301,8 +429,8 @@
             folder: './effects/chorus/',
             dspName: 'chorus',
             voices: 0,
-            bgExpanded: 'url(https://placehold.co/220x340/1a1530/ff5e36?text=Chorus)',
-            bgCollapsed: 'url(https://placehold.co/220x80/1a1530/ff5e36?text=Chorus)',
+            bgExpanded: '/pedal_images/expanded/chorus.png',
+            bgCollapsed: '/pedal_images/collapsed/chorus.png',
             params: [
             { id: 'Rate', label: 'Rate', min:0.1,max:10,step:0.01,default:0.5 },
             { id: 'Depth', label: 'Depth', min:0,max:1,step:0.01,default:0.5 },
@@ -319,8 +447,8 @@
             category: 'Amplificatore / IR',
             type: 'ir',
             irPath: './ir/cab_default.wav',
-            bgExpanded: 'url(https://placehold.co/220x340/1a1530/ff5e36?text=Cab)',
-            bgCollapsed: 'url(https://placehold.co/220x80/1a1530/ff5e36?text=Cab)',
+            bgExpanded: '/pedal_images/expanded/cab.png',
+            bgCollapsed: '/pedal_images/collapsed/cab.png',
             params: [
             { id: 'Volume', label: 'Volume', min:0,max:2,step:0.01,default:0.8 }
             ]
@@ -579,18 +707,43 @@
             rebuildAudioChain();
         }
         
+        // Custom confirm modal (Promise-based)
+        function showConfirm(message) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('confirmModal');
+                const msgEl = document.getElementById('confirmMessage');
+                const okBtn = document.getElementById('confirmOk');
+                const cancelBtn = document.getElementById('confirmCancel');
+                
+                msgEl.textContent = message;
+                modal.classList.add('show');
+                
+                const cleanup = () => {
+                    modal.classList.remove('show');
+                    okBtn.removeEventListener('click', onOk);
+                    cancelBtn.removeEventListener('click', onCancel);
+                };
+                
+                const onOk = () => { cleanup(); resolve(true); };
+                const onCancel = () => { cleanup(); resolve(false); };
+                
+                okBtn.addEventListener('click', onOk);
+                cancelBtn.addEventListener('click', onCancel);
+            });
+        }
+        
         // RIMOZIONE PULITA DI UN PEDALE (Pulisce la memoria WASM ed elimina il nodo audio)
         async function removePedal(instanceId) {
             const pedal = activeRig.find(p => p.instanceId === instanceId);
             
             if (!pedal) return;
             
-            const confirmed = confirm(`Delete "${pedal.def.name}" from the rig?`);
+            const confirmed = await showConfirm(`Delete "${pedal.def.name}" from the rig?`);
             if (!confirmed) return;
             
             if (pedal.node) pedal.node.disconnect();
             if (pedal.faustInstance && pedal.faustInstance.destroy) {
-                pedal.faustInstance.destroy(); // Distrugge l'istanza Faust e libera C++/WASM Memory
+                pedal.faustInstance.destroy();
             }
             
             activeRig = activeRig.filter(p => p.instanceId !== instanceId);
@@ -610,9 +763,9 @@
                 
                 // Immagini di sfondo: espanso e ridotto
                 if (pedal.def.bgExpanded) {
-                    slot.style.setProperty('--bg-expanded', pedal.def.bgExpanded);
-                    slot.style.setProperty('--bg-collapsed', pedal.def.bgCollapsed || pedal.def.bgExpanded);
-                    slot.style.backgroundImage = pedal.def.bgExpanded;
+                    slot.style.setProperty('--bg-expanded', `url(${pedal.def.bgExpanded})`);
+                    slot.style.setProperty('--bg-collapsed', `url(${pedal.def.bgCollapsed || pedal.def.bgExpanded})`);
+                    slot.style.backgroundImage = `url(${pedal.def.bgExpanded})`;
                 }
                 
                 slot.innerHTML = `
@@ -776,5 +929,20 @@
         // Avvio
         renderCatalog();
     </script>
+    
+    <!-- Custom Confirm Modal -->
+    <div id="confirmModal" class="modal-overlay">
+        <div class="modal-dialog">
+            <div class="modal-icon">
+                <i class="fa-solid fa-trash-can"></i>
+            </div>
+            <div class="modal-title">Delete Pedal</div>
+            <div id="confirmMessage" class="modal-message">Are you sure?</div>
+            <div class="modal-actions">
+                <button class="btn-modal btn-modal-cancel" id="confirmCancel">Cancel</button>
+                <button class="btn-modal btn-modal-confirm" id="confirmOk">Delete</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
