@@ -260,14 +260,20 @@
             try {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
                 
-                // Configurazione audio compatibile senza parametri stringenti inutili
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        echoCancellation: false,
-                        noiseSuppression: false,
-                        autoGainControl: false
-                    }
-                });
+                // Tenta di disattivare i filtri, se fallisce passa al fallback audio: true
+                let stream;
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false
+                        }
+                    });
+                } catch (e) {
+                    // Fallback base universalmente supportato da qualsiasi dispositivo/browser
+                    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                }
                 
                 micStreamNode = audioCtx.createMediaStreamSource(stream);
                 updateAudioStatus(true);
@@ -278,7 +284,7 @@
                 
                 rebuildAudioChain();
             } catch (err) {
-                alert("Errore nell'accesso all'input audio: " + err.message);
+                alert("Impossibile accedere all'input audio: " + err.message);
             }
         }
         
