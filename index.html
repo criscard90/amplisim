@@ -134,9 +134,9 @@
         
         .pedalboard {
             display: flex;
-            gap: 20px;
+            flex-wrap: wrap;
+            gap: 16px;
             align-items: flex-start;
-            overflow-x: auto;
             padding-bottom: 16px;
             min-height: 380px;
         }
@@ -155,6 +155,48 @@
             position: relative;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             transition: transform 0.2s ease, border-color 0.2s ease;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+        
+        /* Quando il pedale è ridotto, mostra l'immagine "collapsed" */
+        .pedal-slot.collapsed {
+            background-image: var(--bg-collapsed) !important;
+            min-height: 80px;
+            height: 80px;
+        }
+        
+        /* Cavo che collega i pedali */
+        .pedal-cable {
+            width: 24px;
+            min-width: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        .pedal-cable::before {
+            content: '';
+            width: 4px;
+            height: 60%;
+            background: linear-gradient(180deg, var(--accent) 0%, #ff7350 50%, var(--accent) 100%);
+            border-radius: 2px;
+            box-shadow: 0 0 8px var(--accent-glow);
+        }
+        
+        .pedal-cable::after {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: var(--accent);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 6px var(--accent-glow);
         }
         
         .pedal-slot.dragging { opacity: 0.4; transform: scale(0.95); }
@@ -175,9 +217,10 @@
         .pedal-actions i { cursor: pointer; color: var(--text-muted); font-size: 0.85rem; transition: color 0.2s; }
         .pedal-actions i:hover { color: #ff5252; }
         
-        .knob-container { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 8px; }
+        .knob-container { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 8px; }
         .knob-label { font-size: 0.75rem; color: var(--text-muted); }
         .knob-input { width: 100%; accent-color: var(--accent); cursor: pointer; }
+        .knob-value { font-size: 0.7rem; color: var(--accent); font-weight: 600; min-width: 36px; text-align: center; background: rgba(255,94,54,0.1); border-radius: 6px; padding: 1px 4px; }
         
         .status-bar {
             font-size: 0.8rem;
@@ -229,12 +272,14 @@
         const EFFECTS_REGISTRY = [
         {
             id: 'rat2',
-            name: 'ProCo Rat II',
+            name: 'Distorsion',
             icon: 'fa-solid fa-bolt',
             category: 'Distortion',
             folder: './effects/proco_rat_2/',
             dspName: 'proco_rat_2',
             voices: 0,
+            bgExpanded: 'url(https://placehold.co/220x340/1a1530/ff5e36?text=Distorsion)',
+            bgCollapsed: 'url(https://placehold.co/220x80/1a1530/ff5e36?text=Distorsion)',
             params: [
             { id: 'Distortion', label: 'Distortion', min: 0, max: 1, step: 0.01, default: 0.5 },
             { id: 'Filter', label: 'Filter', min: 0, max: 1, step: 0.01, default: 0.5 },
@@ -250,6 +295,8 @@
             folder: './effects/vintage_delay_2/',
             dspName: 'vintage_delay_2',
             voices: 0,
+            bgExpanded: 'url(https://placehold.co/220x340/1a1530/ff5e36?text=Delay)',
+            bgCollapsed: 'url(https://placehold.co/220x80/1a1530/ff5e36?text=Delay)',
             params: [
             { id: 'Time', label: 'Time (ms)', min:20,max:2000,step:1,default:300 },
             { id: 'Feedback', label: 'Feedback', min:0,max:0.95,step:0.01,default:0.45 },
@@ -266,6 +313,8 @@
             folder: './effects/tremolo/',
             dspName: 'tremolo',
             voices: 0,
+            bgExpanded: 'url(https://placehold.co/220x340/1a1530/ff5e36?text=Tremolo)',
+            bgCollapsed: 'url(https://placehold.co/220x80/1a1530/ff5e36?text=Tremolo)',
             params: [
             { id: 'Rate', label: 'Rate', min:0.1,max:20,step:0.01,default:4 },
             { id: 'Depth', label: 'Depth', min:0,max:1,step:0.01,default:0.7 },
@@ -283,6 +332,8 @@
             folder: './effects/chorus/',
             dspName: 'chorus',
             voices: 0,
+            bgExpanded: 'url(https://placehold.co/220x340/1a1530/ff5e36?text=Chorus)',
+            bgCollapsed: 'url(https://placehold.co/220x80/1a1530/ff5e36?text=Chorus)',
             params: [
             { id: 'Rate', label: 'Rate', min:0.1,max:10,step:0.01,default:0.5 },
             { id: 'Depth', label: 'Depth', min:0,max:1,step:0.01,default:0.5 },
@@ -299,6 +350,8 @@
             category: 'Amplificatore / IR',
             type: 'ir',
             irPath: './ir/cab_default.wav',
+            bgExpanded: 'url(https://placehold.co/220x340/1a1530/ff5e36?text=Cab)',
+            bgCollapsed: 'url(https://placehold.co/220x80/1a1530/ff5e36?text=Cab)',
             params: [
             { id: 'Volume', label: 'Volume', min:0,max:2,step:0.01,default:0.8 }
             ]
@@ -582,6 +635,13 @@
                 slot.dataset.index = index;
                 slot.dataset.instance = pedal.instanceId;
                 
+                // Immagini di sfondo: espanso e ridotto
+                if (pedal.def.bgExpanded) {
+                    slot.style.setProperty('--bg-expanded', pedal.def.bgExpanded);
+                    slot.style.setProperty('--bg-collapsed', pedal.def.bgCollapsed || pedal.def.bgExpanded);
+                    slot.style.backgroundImage = pedal.def.bgExpanded;
+                }
+                
                 slot.innerHTML = `
           <div class="pedal-header">
             <i class="pedal-icone ${pedal.def.icon || 'fa-solid fa-drum'}"></i>
@@ -597,7 +657,8 @@
                 <span class="knob-label">${p.label}</span>
                 <input type="range" class="knob-input" draggable="false" 
                   min="${p.min}" max="${p.max}" step="${p.step}" value="${p.default}"
-                  oninput="updateParam('${pedal.instanceId}', '${p.id}', this.value)">
+                  oninput="updateParam('${pedal.instanceId}', '${p.id}', this.value); this.nextElementSibling.textContent = parseFloat(this.value).toFixed(2)">
+                <span class="knob-value">${parseFloat(p.default).toFixed(2)}</span>
               </div>
             `).join('')}
             ${pedal.def.type === 'ir' ? `
@@ -633,6 +694,14 @@
                 });
                 
                 pedalboard.appendChild(slot);
+                
+                // Aggiungi un "cavo" tra questo pedale e il successivo (non dopo l'ultimo)
+                if (index < activeRig.length - 1) {
+                    const cable = document.createElement('div');
+                    cable.className = 'pedal-cable';
+                    pedalboard.appendChild(cable);
+                }
+                
                 if (pedal.def.type === 'ir') {
                     const input = slot.querySelector('.ir-file');
                     input.addEventListener('change', async (e) => {
