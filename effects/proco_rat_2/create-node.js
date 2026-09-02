@@ -99,15 +99,8 @@ async function connectToAudioInput(audioContext, id, faustNode, oldInputStreamNo
         },
     };
     // Get the audio input stream
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    if (stream) {
-        if (oldInputStreamNode) oldInputStreamNode.disconnect();
-        const newInputStreamNode = audioContext.createMediaStreamSource(stream);
-        newInputStreamNode.connect(faustNode);
-        return newInputStreamNode;
-    } else {
-        return oldInputStreamNode;
-    }
+// MODIFICATO: Usa vincoli generici per evitare OverconstrainedError
+const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 };
 
 /**
