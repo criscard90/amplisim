@@ -286,9 +286,20 @@
                     await audioCtx.resume();
                 }
                 
-                // Microfono senza vincoli avanzati per evitare OverconstrainedError
+                // Microfono con vincoli per ridurre il rumore di fondo a monte:
+                // - noiseSuppression: taglia il fruscio stazionario del microfono (fondamentale
+                //   PRIMA di un distortore, che amplificherebbe il rumorerizona);
+                // - autoGainControl: off, per non far pompare al browser il gain in automatico
+                //   (altrimenti il distortore diventa imprevedibile e il noise sfugge di mano);
+                // - echoCancellation: concentrato a off per coerenza (cuffie, nessun eco).
                 if (!micStreamNode) {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: false,
+                            noiseSuppression: true,
+                            autoGainControl: false
+                        }
+                    });
                     micStreamNode = audioCtx.createMediaStreamSource(stream);
                 }
                 
