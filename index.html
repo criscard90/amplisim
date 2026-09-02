@@ -502,7 +502,7 @@
         <div class="controls-master">
             <div class="status-bar">
                 <div id="statusIndicator" class="status-indicator"></div>
-                <span id="statusText">M-Audio Disconnessa</span>
+                <span id="statusText">Audio non attivo</span>
             </div>
             <button id="btnAudioToggle" class="btn btn-accent">
                 <i class="fa-solid fa-power-off"></i> Attiva Audio
@@ -713,7 +713,7 @@
         function updateAudioStatus(isActive) {
             if (isActive) {
                 statusIndicator.classList.add('active');
-                statusText.innerText = "Audio Attivo (M-Audio OTG)";
+                statusText.innerText = "Audio Attivo";
                 btnAudioToggle.classList.add('active');
                 btnAudioToggle.innerHTML = `<i class="fa-solid fa-power-off"></i> Audio ON`;
             } else {
