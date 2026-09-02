@@ -4,7 +4,7 @@
   "description": "Simulatore di amplificatori ed effetti per chitarra via WebAudio e WASM",
   "start_url": "./index.html",
   "display": "standalone",
-  "orientation": "landscape",
+  "orientation": "any",
   "background_color": "#060411",
   "theme_color": "#0f0c20",
   "icons": [
