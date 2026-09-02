@@ -167,38 +167,6 @@
             height: 80px;
         }
         
-        /* Cavo che collega i pedali */
-        .pedal-cable {
-            width: 24px;
-            min-width: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-        }
-        
-        .pedal-cable::before {
-            content: '';
-            width: 4px;
-            height: 60%;
-            background: linear-gradient(180deg, var(--accent) 0%, #ff7350 50%, var(--accent) 100%);
-            border-radius: 2px;
-            box-shadow: 0 0 8px var(--accent-glow);
-        }
-        
-        .pedal-cable::after {
-            content: '';
-            position: absolute;
-            width: 12px;
-            height: 12px;
-            background: var(--accent);
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 0 6px var(--accent-glow);
-        }
-        
         .pedal-slot.dragging { opacity: 0.4; transform: scale(0.95); }
         .pedal-slot.collapsed .pedal-controls { display: none; }
         .pedal-icone { color: var(--accent); font-size: 0.9rem; cursor: default; }
@@ -214,6 +182,7 @@
         }
         
         .pedal-title { font-size: 0.9rem; font-weight: 700; color: var(--accent); }
+        .pedal-actions { display: flex; gap: 14px; align-items: center; }
         .pedal-actions i { cursor: pointer; color: var(--text-muted); font-size: 0.85rem; transition: color 0.2s; }
         .pedal-actions i:hover { color: #ff5252; }
         
@@ -597,7 +566,8 @@
                 instanceId,
                 def: effectDef,
                 faustInstance: null,
-                node: null
+                node: null,
+                currentParams: {}
             };
             
             if (audioCtx) {
@@ -613,11 +583,14 @@
         async function removePedal(instanceId) {
             const pedal = activeRig.find(p => p.instanceId === instanceId);
             
-            if (pedal) {
-                if (pedal.node) pedal.node.disconnect();
-                if (pedal.faustInstance && pedal.faustInstance.destroy) {
-                    pedal.faustInstance.destroy(); // Distrugge l'istanza Faust e libera C++/WASM Memory
-                }
+            if (!pedal) return;
+            
+            const confirmed = confirm(`Delete "${pedal.def.name}" from the rig?`);
+            if (!confirmed) return;
+            
+            if (pedal.node) pedal.node.disconnect();
+            if (pedal.faustInstance && pedal.faustInstance.destroy) {
+                pedal.faustInstance.destroy(); // Distrugge l'istanza Faust e libera C++/WASM Memory
             }
             
             activeRig = activeRig.filter(p => p.instanceId !== instanceId);
@@ -652,15 +625,18 @@
             </div>
           </div>
           <div class="pedal-controls">
-            ${pedal.def.params.map(p => `
+            ${pedal.def.params.map(p => {
+                  const savedVal = pedal.currentParams.hasOwnProperty(p.id) ? pedal.currentParams[p.id] : p.default;
+                  return `
               <div class="knob-container">
                 <span class="knob-label">${p.label}</span>
                 <input type="range" class="knob-input" draggable="false" 
-                  min="${p.min}" max="${p.max}" step="${p.step}" value="${p.default}"
+                  min="${p.min}" max="${p.max}" step="${p.step}" value="${savedVal}"
                   oninput="updateParam('${pedal.instanceId}', '${p.id}', this.value); this.nextElementSibling.textContent = parseFloat(this.value).toFixed(2)">
-                <span class="knob-value">${parseFloat(p.default).toFixed(2)}</span>
+                <span class="knob-value">${parseFloat(savedVal).toFixed(2)}</span>
               </div>
-            `).join('')}
+                  `;
+                }).join('')}
             ${pedal.def.type === 'ir' ? `
               <div class="knob-container ir-upload-row">
                 <span class="knob-label">IR (.wav)</span>
@@ -695,13 +671,6 @@
                 
                 pedalboard.appendChild(slot);
                 
-                // Aggiungi un "cavo" tra questo pedale e il successivo (non dopo l'ultimo)
-                if (index < activeRig.length - 1) {
-                    const cable = document.createElement('div');
-                    cable.className = 'pedal-cable';
-                    pedalboard.appendChild(cable);
-                }
-                
                 if (pedal.def.type === 'ir') {
                     const input = slot.querySelector('.ir-file');
                     input.addEventListener('change', async (e) => {
@@ -733,14 +702,19 @@
 
         function updateParam(instanceId, paramId, value) {
             const pedal = activeRig.find(p => p.instanceId === instanceId);
+            if (!pedal) return;
+            
+            // Salva il valore corrente per preservarlo al re-render
+            pedal.currentParams[paramId] = parseFloat(value);
+            
             // Pedale IR: il "Volume" controlla il gain del ConvolverNode(la catena termina su gain.
-            if (pedal && pedal.def.type === 'ir') {
+            if (pedal.def.type === 'ir') {
                 if (paramId === 'Volume' && pedal.node && pedal.node.gain) {
                     pedal.node.gain.value = parseFloat(value);
                 }
                 return;
             }
-            if (pedal && pedal.faustInstance && typeof pedal.faustInstance.setParamValue === 'function') {
+            if (pedal.faustInstance && typeof pedal.faustInstance.setParamValue === 'function') {
                 // Il prefisso dell'address generato da Faust e& il NOME DSP (dspName),
                 // NON l'id UI della registry (che può essere arbitrario, es. 'rat2').
                 const dspName = pedal.def.dspName || pedal.def.id;
