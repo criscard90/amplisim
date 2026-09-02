@@ -801,6 +801,29 @@
                 transform: translateY(0);
             }
         }
+        
+        /* Update banner button */
+        .btn-update {
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            margin-left: auto;
+            white-space: nowrap;
+        }
+        
+        .update-banner {
+            border-color: #00e676;
+            box-shadow: 0 4px 20px rgba(0, 230, 118, 0.3);
+        }
+        
+        .update-banner i {
+            color: #00e676;
+            animation: spin 2s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -870,25 +893,22 @@
     </button>
     
     <script>
-        // Auto-update: rileva nuovi service worker e forza il refresh
+        // Auto-update: mostra banner per aggiornamento (compatibile PWA)
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./service-worker.js').then(reg => {
-                // Controlla aggiornamenti ogni minuto
                 setInterval(() => reg.update(), 60000);
                 
-                // Se c'è un nuovo SW in attesa
                 reg.addEventListener('updatefound', () => {
                     const newWorker = reg.installing;
                     newWorker.addEventListener('statechange', () => {
-                        // Quando il nuovo SW è installato e in attesa
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            // Forza il nuovo SW a prendere il controllo
-                            newWorker.postMessage({ type: 'SKIP_WAITING' });
+                            // Mostra banner invece di auto-reload
+                            showUpdateBanner(newWorker);
                         }
                     });
                 });
                 
-                // Quando il nuovo SW prende il controllo, ricarica la pagina
+                // Quando il nuovo SW prende il controllo, ricarica
                 navigator.serviceWorker.addEventListener('controllerchange', () => {
                     window.location.reload();
                 });
@@ -1318,6 +1338,44 @@
                     toast.remove();
                 }, 300);
             }, 3000);
+        }
+        
+        // Show update banner for PWA/app
+        function showUpdateBanner(newWorker) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast update-banner';
+            toast.id = 'updateBanner';
+            toast.innerHTML = `
+                <i class="fa-solid fa-sync-alt"></i>
+                <div class="toast-content">
+                    <span class="toast-title">Aggiornamento disponibile</span>
+                    <span class="toast-message">Nuova versione dell'app. Clicca per aggiornare.</span>
+                </div>
+                <button class="btn btn-accent btn-update" onclick="applyUpdate()">
+                    <i class="fa-solid fa-download"></i> Aggiorna
+                </button>
+            `;
+            container.appendChild(toast);
+            
+            requestAnimationFrame(() => {
+                toast.classList.add('show');
+            });
+            
+            // Store reference for later
+            window._pendingWorker = newWorker;
+        }
+        
+        // Apply the pending update
+        function applyUpdate() {
+            if (window._pendingWorker) {
+                window._pendingWorker.postMessage({ type: 'SKIP_WAITING' });
+            }
+            const banner = document.getElementById('updateBanner');
+            if (banner) {
+                banner.classList.remove('show');
+                setTimeout(() => banner.remove(), 300);
+            }
         }
         
         async function addEffectToRig(effectDef) {
