@@ -490,6 +490,76 @@
         .preset-input::placeholder {
             color: var(--text-muted);
         }
+        
+        /* Catalog sections */
+        .catalog-section {
+            margin-bottom: 4px;
+        }
+        
+        .catalog-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+        
+        .catalog-section-header:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+        
+        .catalog-section-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-main);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .catalog-section-label i {
+            font-size: 0.7rem;
+            color: var(--accent);
+        }
+        
+        .catalog-section-count {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.08);
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-right: 8px;
+        }
+        
+        .catalog-section-chevron {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            transition: transform 0.25s ease;
+        }
+        
+        .catalog-section.open .catalog-section-chevron {
+            transform: rotate(180deg);
+        }
+        
+        .catalog-section-items {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            padding: 0 4px;
+        }
+        
+        .catalog-section.open .catalog-section-items {
+            max-height: 600px;
+            padding: 8px 4px 4px 4px;
+        }
     </style>
 </head>
 <body>
@@ -842,19 +912,65 @@
         
         function renderCatalog() {
             catalogList.innerHTML = '';
+            
+            // Group effects by category
+            const categories = {};
             EFFECTS_REGISTRY.forEach(effect => {
-                const card = document.createElement('div');
-                card.className = 'effect-card';
-                card.innerHTML = `
-          <div class="effect-info">
-            <i class="effect-icon ${effect.icon || 'fa-solid fa-drum'}"></i>
-            <h3>${effect.name}</h3>
-            <p>${effect.category}</p>
-          </div>
-          <i class="fa-solid fa-plus-circle" style="color: var(--accent)"></i>
-        `;
-                card.onclick = () => addEffectToRig(effect);
-                catalogList.appendChild(card);
+                const cat = effect.category || 'Other';
+                if (!categories[cat]) categories[cat] = [];
+                categories[cat].push(effect);
+            });
+            
+            // Category icons
+            const catIcons = {
+                'Distortion': 'fa-solid fa-bolt',
+                'Echo / Delay': 'fa-solid fa-clock',
+                'Modulation': 'fa-solid fa-wave-square',
+                'Amplificatore / IR': 'fa-solid fa-tower-broadcast'
+            };
+            
+            // Create collapsible sections (default: collapsed)
+            Object.entries(categories).forEach(([category, effects]) => {
+                const section = document.createElement('div');
+                section.className = 'catalog-section';
+                
+                const header = document.createElement('div');
+                header.className = 'catalog-section-header';
+                header.innerHTML = `
+                    <span class="catalog-section-label">
+                        <i class="${catIcons[category] || 'fa-solid fa-layer-group'}"></i>
+                        ${category}
+                    </span>
+                    <span style="display:flex;align-items:center;gap:6px;">
+                        <span class="catalog-section-count">${effects.length}</span>
+                        <i class="fa-solid fa-chevron-down catalog-section-chevron"></i>
+                    </span>
+                `;
+                
+                const itemsContainer = document.createElement('div');
+                itemsContainer.className = 'catalog-section-items';
+                
+                effects.forEach(effect => {
+                    const card = document.createElement('div');
+                    card.className = 'effect-card';
+                    card.innerHTML = `
+              <div class="effect-info">
+                <i class="effect-icon ${effect.icon || 'fa-solid fa-drum'}"></i>
+                <h3>${effect.name}</h3>
+              </div>
+              <i class="fa-solid fa-plus-circle" style="color: var(--accent)"></i>
+            `;
+                    card.onclick = () => addEffectToRig(effect);
+                    itemsContainer.appendChild(card);
+                });
+                
+                header.addEventListener('click', () => {
+                    section.classList.toggle('open');
+                });
+                
+                section.appendChild(header);
+                section.appendChild(itemsContainer);
+                catalogList.appendChild(section);
             });
         }
         
