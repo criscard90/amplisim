@@ -1045,9 +1045,11 @@
         btnAudioToggle.addEventListener('click', async () => {
             if (!audioCtx) {
                 await initAudio();
+                rebuildAudioChain();
                 tryAutoFullscreen();
             } else if (audioCtx.state === 'suspended') {
                 await audioCtx.resume();
+                rebuildAudioChain();
                 updateAudioStatus(true);
             } else {
                 await audioCtx.suspend();
@@ -1173,6 +1175,19 @@
         
         
         
+        // Crea un IR di fallback (impulso secco) per garantire che il convolver
+        // passi l'audio anche senza un file IR caricato
+        function createFallbackIR() {
+            const sampleRate = audioCtx.sampleRate;
+            const length = 1; // 1 solo sample = passthrough perfetto
+            const buffer = audioCtx.createBuffer(2, length, sampleRate);
+            for (let channel = 0; channel < 2; channel++) {
+                const data = buffer.getChannelData(channel);
+                data[0] = 1.0; // Impulso unitario
+            }
+            return buffer;
+        }
+
         async function initIRPedal(pedal) {
             if (!audioCtx) return;
             const conv = audioCtx.createConvolver();
@@ -1183,12 +1198,14 @@
             pedal.irNode = conv;
             pedal.node = gain;
             pedal.faustInstance = null;
-            // Se la registry ha un irPath (file .wav messo dal utente nel repo), lo carica in automatico.
             
-            
-            
+            // Carica l'IR dal percorso se disponibile, altrimenti usa il fallback
             if (pedal.def.irPath) {
                 await loadIRFromPath(pedal);
+            }
+            // Se il buffer non è stato caricato (fetch fallita o nessun irPath), usa fallback
+            if (!conv.buffer) {
+                conv.buffer = createFallbackIR();
             }
         }
         
@@ -1245,13 +1262,20 @@
             micStreamNode.disconnect();
             activeRig.forEach(pedal => {
                 if (pedal.node) pedal.node.disconnect();
+                if (pedal.irNode) pedal.irNode.disconnect();
             });
             
             let currentSource = micStreamNode;
             
             // Collega in serie tutti i pedali attivi
             activeRig.forEach(pedal => {
-                if (pedal.node) {
+                if (pedal.def.type === 'ir') {
+                    // Pedale IR: il segnale passa attraverso il convolver (irNode) poi al gain (node)
+                    if (pedal.irNode) {
+                        currentSource.connect(pedal.irNode);
+                        currentSource = pedal.node || pedal.irNode;
+                    }
+                } else if (pedal.node) {
                     currentSource.connect(pedal.node);
                     currentSource = pedal.node;
                 }
