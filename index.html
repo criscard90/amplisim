@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -236,6 +236,22 @@
             { id: 'Volume', label: 'Volume', min: 0, max: 1, step: 0.01, default: 0.7 }
             ]
         }
+        ,
+{
+            id: 'vang2',
+            name: 'Vintage Delay',
+            category: 'Echo / Delay',
+            folder: './effects/vintage_delay_2/',
+            dspName: 'vintage_delay_2',
+            voices: 0,
+            params: [
+            { id: 'Time', label: 'Time (ms)', min:20,max:2000,step:1,default:300 },
+            { id: 'Feedback', label: 'Feedback', min:0,max:0.95,step:0.01,default:0.45 },
+            { id: 'Mix', label: 'Mix', min:0,max:1,step:0.01,default:0.5 },
+            { id: 'Tone', label: 'Tone', min:0,max:1,step:0.01,default:0.6 },
+            { id: 'Drive', label: 'Drive', min:0,max:1,step:0.01,default:0.35 }
+            ]
+        }
         ];
         
         // 2. STATO AUDIO E ROUTING ENGINE
@@ -302,12 +318,12 @@
             try {
                 const folder = pedal.def.folder.endsWith('/') ? pedal.def.folder : `${pedal.def.folder}/`;
                 // Carichiamo il loader condiviso (js/faust-loader.js) invece di una copia
-                // per-cartella: il loader è identico per tutti gli effetti.
+                // per-cartella: il loader ├¿ identico per tutti gli effetti.
                 const { createFaustNode } = await import('./js/faust-loader.js');
 
                 if (!createFaustNode) throw new Error("Funzione factory (createFaustNode) non trovata");
 
-                /* Passiamo a createFaustNode la cartella dell'effetto: da lì legge
+                /* Passiamo a createFaustNode la cartella dell'effetto: da l├¼ legge
                 dsp-meta.json, dsp-module.wasm, ecc. e crea il nodo WebAudio puro. */
                 const instance = await createFaustNode(audioCtx, folder, {
                     dspName: pedal.def.dspName,
@@ -456,8 +472,10 @@
         function updateParam(instanceId, paramId, value) {
             const pedal = activeRig.find(p => p.instanceId === instanceId);
             if (pedal && pedal.faustInstance && typeof pedal.faustInstance.setParamValue === 'function') {
-                // Invia il valore al percorso relativo del parametro
-                const paramPath = `/${pedal.def.id}/${paramId}`;
+                // Il prefisso dell'address generato da Faust e& il NOME DSP (dspName),
+                // NON l'id UI della registry (che può essere arbitrario, es. 'rat2').
+                const dspName = pedal.def.dspName || pedal.def.id;
+                const paramPath = `/${dspName}/${paramId}`;
                 pedal.faustInstance.setParamValue(paramPath, parseFloat(value));
             }
         }
