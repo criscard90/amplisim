@@ -315,7 +315,9 @@
                 });
                 
                 // Se la funzione ha creato autonomamente un microfono interno, lo colleghiamo al nostro contesto
-                pedal.faustInstance = instance;
+                // IMPORTANTE: faustInstance DEVE essere il nodo audio effettivo (instance.faustNode),
+                // non il wrapper { faustNode, dspMeta }: setParamValue() e destroy() sono metodi del nodo.
+                pedal.faustInstance = instance && instance.faustNode ? instance.faustNode : instance;
                 
                 // Estraiamo solo il nodo WebAudio puro (senza lo stream microfonico di Faust)
                 if (instance && instance.faustNode) {
@@ -453,7 +455,7 @@
         
         function updateParam(instanceId, paramId, value) {
             const pedal = activeRig.find(p => p.instanceId === instanceId);
-            if (pedal && pedal.faustInstance) {
+            if (pedal && pedal.faustInstance && typeof pedal.faustInstance.setParamValue === 'function') {
                 // Invia il valore al percorso relativo del parametro
                 const paramPath = `/${pedal.def.id}/${paramId}`;
                 pedal.faustInstance.setParamValue(paramPath, parseFloat(value));
