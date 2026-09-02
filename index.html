@@ -222,6 +222,38 @@
         .status-indicator { width: 8px; height: 8px; border-radius: 50%; background: #ff5252; }
         .status-indicator.active { background: #00e676; box-shadow: 0 0 8px #00e676; }
         
+        /* Microphone level meter */
+        .mic-level-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+        }
+        
+        .mic-level-bg {
+            width: 60px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .mic-level-bar {
+            width: 0%;
+            height: 100%;
+            background: #333;
+            border-radius: 3px;
+            transition: width 0.05s ease;
+        }
+        
+        .mic-level-icon {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        
         /* Custom confirm modal */
         .modal-overlay {
             position: fixed;
@@ -838,6 +870,15 @@
                 <div id="statusIndicator" class="status-indicator"></div>
                 <span id="statusText">Audio non attivo</span>
             </div>
+            <div class="mic-level-container" title="Livello microfono">
+                <div class="mic-level-bg">
+                    <div id="micLevelBar" class="mic-level-bar"></div>
+                </div>
+                <i class="fa-solid fa-microphone mic-level-icon"></i>
+            </div>
+            <button id="btnTestTone" class="btn" title="Test audio (suona un tono)">
+                <i class="fa-solid fa-volume-high"></i>
+            </button>
             <button id="btnAudioToggle" class="btn btn-accent">
                 <i class="fa-solid fa-power-off"></i> Attiva Audio
             </button>
@@ -1007,11 +1048,79 @@
         // 2. STATO AUDIO E ROUTING ENGINE
         let audioCtx = null;
         let micStreamNode = null;
-        let activeRig = []; 
+        let activeRig = [];
+        let micAnalyser = null;
+        let testOscillator = null;
         
         const btnAudioToggle = document.getElementById('btnAudioToggle');
         const statusIndicator = document.getElementById('statusIndicator');
         const statusText = document.getElementById('statusText');
+        
+        // Test audio: genera un tono per verificare che l'uscita funzioni
+        function playTestTone() {
+            if (!audioCtx) return;
+            stopTestTone();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.frequency.value = 440; // La 440Hz
+            osc.type = 'sine';
+            gain.gain.value = 0.1; // Volume basso
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            testOscillator = { osc, gain };
+            console.log('Test tone avviato (440Hz)');
+        }
+        
+        function stopTestTone() {
+            if (testOscillator) {
+                try {
+                    testOscillator.osc.stop();
+                    testOscillator.osc.disconnect();
+                    testOscillator.gain.disconnect();
+                } catch (e) {}
+                testOscillator = null;
+            }
+        }
+        
+        // Livellimetro microfono: analizza il segnale del mic e mostra il livello
+        function setupMicAnalyser() {
+            if (!audioCtx || !micStreamNode) return;
+            micAnalyser = audioCtx.createAnalyser();
+            micAnalyser.fftSize = 256;
+            micStreamNode.connect(micAnalyser);
+            console.log('Microfono analyser configurato');
+        }
+        
+        function getMicLevel() {
+            if (!micAnalyser) return 0;
+            const data = new Uint8Array(micAnalyser.frequencyBinCount);
+            micAnalyser.getByteFrequencyData(data);
+            let sum = 0;
+            for (let i = 0; i < data.length; i++) sum += data[i];
+            return sum / data.length / 255; // Normalizzato 0-1
+        }
+        
+        // Avvia l'aggiornamento dell'indicatore livello microfono
+        let micLevelInterval = null;
+        function startMicLevelMeter() {
+            if (micLevelInterval) clearInterval(micLevelInterval);
+            const levelBar = document.getElementById('micLevelBar');
+            if (!levelBar) return;
+            
+            micLevelInterval = setInterval(() => {
+                const level = getMicLevel();
+                levelBar.style.width = `${Math.min(level * 200, 100)}%`; // Amplifica per visibilità
+                levelBar.style.background = level > 0.05 ? '#00e676' : '#333';
+            }, 50);
+        }
+        
+        function stopMicLevelMeter() {
+            if (micLevelInterval) {
+                clearInterval(micLevelInterval);
+                micLevelInterval = null;
+            }
+        }
         
         // FULLSCREEN — richiede interazione utente, quindi lo triggeriamo
         // al primo click sul pulsante audio (e poi si può attivare/disattivare
@@ -1057,6 +1166,19 @@
             }
         });
 
+        // Test tone button: suona un tono 440Hz per verificare l'uscita audio
+        document.getElementById('btnTestTone').addEventListener('click', () => {
+            if (!audioCtx) {
+                alert('Prima attiva il audio con il pulsante "Attiva Audio"');
+                return;
+            }
+            if (testOscillator) {
+                stopTestTone();
+            } else {
+                playTestTone();
+            }
+        });
+
         // Backup: garantisce resume dell'AudioContext al primo user gesture
         // Necessario su mobile dove l'AudioContext parte sempre in 'suspended'
         const resumeAudioGesture = async () => {
@@ -1070,23 +1192,22 @@
 
         async function initAudio() {
             try {
-                // AudioContext ottimizzato per latenza bassa e compatibilità USB audio:
-                // - latencyHint: 'interactive' richiede ~5ms (vs ~48ms di default su mobile)
-                // - sampleRate: 48000 match con la maggior parte delle schede USB (M-Audio, Focusrite, iRig)
+                // AudioContext ottimizzato per latenza bassa
+                // NOTA: non imponiamo sampleRate per compatibilità mobile
                 if (!audioCtx) {
                     audioCtx = new (window.AudioContext || window.webkitAudioContext)({
-                        latencyHint: 'interactive',
-                        sampleRate: 48000
+                        latencyHint: 'interactive'
                     });
-                    console.log(`AudioContext creato: sampleRate=${audioCtx.sampleRate}Hz, baseLatency=${audioCtx.baseLatency}s`);
+                    console.log(`AudioContext creato: sampleRate=${audioCtx.sampleRate}Hz, state=${audioCtx.state}`);
                 }
                 
+                // Su mobile l'AudioContext parte sempre in 'suspended' - serve resume() nel gesture
                 if (audioCtx.state === 'suspended') {
                     await audioCtx.resume();
+                    console.log(`AudioContext ripreso: state=${audioCtx.state}`);
                 }
                 
-                // Tentativo di routing output su scheda USB se disponibile
-                // (supportato su Chrome Android, non su Safari iOS)
+                // Tentativo di routing output su scheda USB (solo Chrome Android)
                 if (audioCtx.setSinkId) {
                     try {
                         const devices = await navigator.mediaDevices.enumerateDevices();
@@ -1109,31 +1230,40 @@
                     }
                 }
                 
-                // Microfono con vincoli MINIMI per compatibilità con schede USB:
-                // - noiseSuppression: OFF — FONDAMENTALE! Blocca il segnale Hi-Z delle chitarre
-                //   su interfacce USB professionali (il browser interpreta il segnale come rumore)
-                // - autoGainControl: off, per non pompare gain in automatico (distorsore imprevedibile)
-                // - echoCancellation: off, nessun eco con cuffie/scheda diretta
-                // - channelCount: 1, mono come il segnale della chitarra
+                // Microfono con vincoli disabilitati per compatibilità schede USB
                 if (!micStreamNode) {
-                    const stream = await navigator.mediaDevices.getUserMedia({
-                        audio: {
-                            echoCancellation: false,
-                            noiseSuppression: false,
-                            autoGainControl: false,
-                            channelCount: 1
-                        }
-                    });
+                    let stream;
+                    try {
+                        // Primo tentativo: vincoli ottimizzati per schede USB
+                        stream = await navigator.mediaDevices.getUserMedia({
+                            audio: {
+                                echoCancellation: false,
+                                noiseSuppression: false,
+                                autoGainControl: false,
+                                channelCount: 1
+                            }
+                        });
+                    } catch (err) {
+                        console.warn('Vincoli restrittivi falliti, tentativo con audio base:', err);
+                        // Fallback: audio senza vincoli (compatibilità mobile)
+                        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    }
                     const audioTracks = stream.getAudioTracks();
                     if (audioTracks.length > 0) {
                         console.log(`Input attivo: ${audioTracks[0].label} (${audioTracks[0].getSettings().channelCount || 'n/d'} canali)`);
                     }
                     micStreamNode = audioCtx.createMediaStreamSource(stream);
+                    console.log(`micStreamNode creato: ${micStreamNode ? 'OK' : 'FALLITO'}`);
+                    
+                    // Configura l'analizzatore per il livellimetro
+                    setupMicAnalyser();
+                    startMicLevelMeter();
                 }
                 
                 updateAudioStatus(true);
             } catch (err) {
                 console.error("Errore inizializzazione audio:", err);
+                alert(`Errore audio: ${err.message}. Verifica permessi microfono.`);
             }
         }
         
@@ -1177,14 +1307,13 @@
         
         // Crea un IR di fallback (impulso secco) per garantire che il convolver
         // passi l'audio anche senza un file IR caricato
+        // MONO per matchare il microfono (channelCount: 1)
         function createFallbackIR() {
             const sampleRate = audioCtx.sampleRate;
             const length = 1; // 1 solo sample = passthrough perfetto
-            const buffer = audioCtx.createBuffer(2, length, sampleRate);
-            for (let channel = 0; channel < 2; channel++) {
-                const data = buffer.getChannelData(channel);
-                data[0] = 1.0; // Impulso unitario
-            }
+            const buffer = audioCtx.createBuffer(1, length, sampleRate);
+            const data = buffer.getChannelData(0);
+            data[0] = 1.0; // Impulso unitario
             return buffer;
         }
 
@@ -1256,7 +1385,16 @@
         
         // Riconnette l'intera catena audio
         function rebuildAudioChain() {
-            if (!audioCtx || !micStreamNode) return;
+            if (!audioCtx) {
+                console.error('rebuildAudioChain: audioCtx non disponibile');
+                return;
+            }
+            if (!micStreamNode) {
+                console.error('rebuildAudioChain: micStreamNode non disponibile');
+                return;
+            }
+            
+            console.log(`rebuildAudioChain: ${activeRig.length} pedali attivi`);
             
             // Disconnette ogni nodo
             micStreamNode.disconnect();
@@ -1268,21 +1406,28 @@
             let currentSource = micStreamNode;
             
             // Collega in serie tutti i pedali attivi
-            activeRig.forEach(pedal => {
+            activeRig.forEach((pedal, idx) => {
                 if (pedal.def.type === 'ir') {
                     // Pedale IR: il segnale passa attraverso il convolver (irNode) poi al gain (node)
                     if (pedal.irNode) {
+                        console.log(`  [${idx}] Pedale IR: ${pedal.def.name} -> convolver -> gain`);
                         currentSource.connect(pedal.irNode);
                         currentSource = pedal.node || pedal.irNode;
+                    } else {
+                        console.warn(`  [${idx}] Pedale IR senza irNode: ${pedal.def.name}`);
                     }
                 } else if (pedal.node) {
+                    console.log(`  [${idx}] Pedale Faust: ${pedal.def.name}`);
                     currentSource.connect(pedal.node);
                     currentSource = pedal.node;
+                } else {
+                    console.warn(`  [${idx}] Pedale senza node: ${pedal.def.name}`);
                 }
             });
             
             // Uscita verso le cuffie/scheda M-Audio
             currentSource.connect(audioCtx.destination);
+            console.log(`rebuildAudioChain: catena completata (${activeRig.length} pedali -> destination)`);
         }
         
         // 3. INTERFACCIA UTENTE E DRAG & DROP
@@ -1807,6 +1952,13 @@
         
         function handleDragEnd() {
             this.classList.remove('dragging');
+        }
+        
+        // Verifica contesto sicuro (HTTPS o localhost) - necessario per getUserMedia
+        if (!window.isSecureContext) {
+            console.warn('Attenzione: la pagina non è in un contesto sicuro (HTTPS/localhost). Il microfono potrebbe non funzionare.');
+            statusText.innerText = 'Serve HTTPS per il microfono';
+            statusText.style.color = '#ff5252';
         }
         
         // Avvio
