@@ -329,6 +329,167 @@
             background: #ff7350;
             transform: translateY(-1px);
         }
+        
+        /* Preset bar */
+        .preset-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 0;
+            border-top: 1px solid var(--glass-border);
+            margin-top: 8px;
+        }
+        
+        .preset-bar-title {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+        
+        .btn-preset {
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid var(--glass-border);
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .btn-preset-save {
+            background: var(--accent);
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 3px 12px var(--accent-glow);
+        }
+        
+        .btn-preset-save:hover {
+            background: #ff7350;
+            transform: translateY(-1px);
+        }
+        
+        .btn-preset-load {
+            background: var(--glass-bg);
+            color: var(--text-main);
+        }
+        
+        .btn-preset-load:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+        
+        /* Preset list in modal */
+        .preset-list {
+            max-height: 280px;
+            overflow-y: auto;
+            margin: 16px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .preset-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            transition: all 0.2s ease;
+        }
+        
+        .preset-item:hover {
+            border-color: rgba(255, 255, 255, 0.25);
+            background: rgba(255, 255, 255, 0.08);
+        }
+        
+        .preset-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .preset-name {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+        
+        .preset-meta {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+        
+        .preset-item-actions {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .btn-preset-action {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: 1px solid var(--glass-border);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            font-size: 0.75rem;
+        }
+        
+        .btn-preset-action:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .btn-preset-action.delete:hover {
+            color: #ff5252;
+            border-color: #ff5252;
+        }
+        
+        .preset-empty {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+        
+        .preset-input-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .preset-input {
+            flex: 1;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--glass-border);
+            background: var(--glass-bg);
+            color: var(--text-main);
+            font-size: 0.85rem;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+        
+        .preset-input:focus {
+            border-color: var(--accent);
+        }
+        
+        .preset-input::placeholder {
+            color: var(--text-muted);
+        }
     </style>
 </head>
 <body>
@@ -361,6 +522,15 @@
                 <span style="font-size: 0.8rem; color: var(--text-muted);">Trascina per riordinare gli effetti</span>
             </div>
             <div id="pedalboard" class="pedalboard"></div>
+            <div class="preset-bar">
+                <span class="preset-bar-title">Presets</span>
+                <button class="btn-preset btn-preset-save" onclick="openSavePresetModal()">
+                    <i class="fa-solid fa-floppy-disk"></i> Save
+                </button>
+                <button class="btn-preset btn-preset-load" onclick="openLoadPresetModal()">
+                    <i class="fa-solid fa-folder-open"></i> Load
+                </button>
+            </div>
         </section>
     </main>
     
@@ -751,6 +921,147 @@
             rebuildAudioChain();
         }
         
+        // PRESET SYSTEM — localStorage
+        const PRESETS_STORAGE_KEY = 'ampRigPresets';
+        
+        function getPresets() {
+            try { return JSON.parse(localStorage.getItem(PRESETS_STORAGE_KEY)) || []; }
+            catch { return []; }
+        }
+        
+        function setPresets(presets) {
+            localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
+        }
+        
+        }
+        
+        // PRESET SYSTEM — Save & recall rig configurations via localStorage
+        const PRESETS_STORAGE_KEY = 'ampRigPresets';
+        
+        function getPresets() {
+            try { return JSON.parse(localStorage.getItem(PRESETS_STORAGE_KEY)) || []; }
+            catch { return []; }
+        }
+        
+        function setPresets(presets) {
+            localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
+        }
+        
+        function savePreset() {
+            const nameInput = document.getElementById('presetNameInput');
+            const name = nameInput.value.trim();
+            if (!name) { nameInput.focus(); return; }
+            if (activeRig.length === 0) { alert('Add at least one pedal before saving.'); return; }
+            
+            const preset = {
+                id: 'preset_' + Date.now(),
+                name: name,
+                date: new Date().toISOString(),
+                rig: activeRig.map(p => ({ id: p.def.id, params: { ...p.currentParams } }))
+            };
+            
+            const presets = getPresets();
+            presets.push(preset);
+            setPresets(presets);
+            nameInput.value = '';
+            closeSavePresetModal();
+        }
+        
+        async function loadPreset(presetId) {
+            const preset = getPresets().find(p => p.id === presetId);
+            if (!preset) return;
+            
+            activeRig.forEach(p => {
+                if (p.node) p.node.disconnect();
+                if (p.faustInstance && p.faustInstance.destroy) p.faustInstance.destroy();
+            });
+            activeRig = [];
+            
+            for (const sp of preset.rig) {
+                const def = EFFECTS_REGISTRY.find(e => e.id === sp.id);
+                if (!def) continue;
+                const instanceId = 'pedal_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+                const pedalData = { instanceId, def, faustInstance: null, node: null, currentParams: { ...sp.params } };
+                
+                if (audioCtx) {
+                    await loadPedalNode(pedalData);
+                    for (const [paramId, value] of Object.entries(sp.params)) {
+                        if (def.type === 'ir') {
+                            if (paramId === 'Volume' && pedalData.node && pedalData.node.gain) pedalData.node.gain.value = value;
+                        } else if (pedalData.faustInstance && typeof pedalData.faustInstance.setParamValue === 'function') {
+                            const dspName = def.dspName || def.id;
+                            pedalData.faustInstance.setParamValue(`/${dspName}/${paramId}`, value);
+                        }
+                    }
+                }
+                activeRig.push(pedalData);
+            }
+            
+            renderPedalboard();
+            rebuildAudioChain();
+            closeLoadPresetModal();
+        }
+        
+        async function deletePreset(presetId) {
+            if (!await showConfirm('Delete this preset? This cannot be undone.')) return;
+            setPresets(getPresets().filter(p => p.id !== presetId));
+            renderPresetList();
+        }
+        
+        function openSavePresetModal() {
+            if (activeRig.length === 0) { alert('Add at least one pedal before saving a preset.'); return; }
+            document.getElementById('savePresetModal').classList.add('show');
+            setTimeout(() => document.getElementById('presetNameInput').focus(), 100);
+        }
+        
+        function closeSavePresetModal() {
+            document.getElementById('savePresetModal').classList.remove('show');
+        }
+        
+        function openLoadPresetModal() {
+            const presets = getPresets();
+            if (presets.length === 0) { alert('No presets saved yet.'); return; }
+            renderPresetList();
+            document.getElementById('loadPresetModal').classList.add('show');
+        }
+        
+        function closeLoadPresetModal() {
+            document.getElementById('loadPresetModal').classList.remove('show');
+        }
+        
+        function renderPresetList() {
+            const listEl = document.getElementById('presetList');
+            const presets = getPresets();
+            
+            if (presets.length === 0) {
+                listEl.innerHTML = '<div class="preset-empty"><i class="fa-solid fa-inbox"></i><br>No presets saved yet</div>';
+                return;
+            }
+            
+            listEl.innerHTML = presets.map(preset => {
+                const d = new Date(preset.date);
+                const dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const pedalNames = preset.rig.map(p => {
+                    const def = EFFECTS_REGISTRY.find(e => e.id === p.id);
+                    return def ? def.name : p.id;
+                }).join(', ');
+                
+                return `
+                    <div class="preset-item">
+                        <div class="preset-info">
+                            <span class="preset-name">${preset.name}</span>
+                            <span class="preset-meta">${dateStr} · ${preset.rig.length} pedal${preset.rig.length !== 1 ? 's' : ''}</span>
+                            <span class="preset-meta" style="font-size:0.65rem;opacity:0.7;">${pedalNames}</span>
+                        </div>
+                        <div class="preset-item-actions">
+                            <button class="btn-preset-action load" onclick="loadPreset('${preset.id}')" title="Load"><i class="fa-solid fa-upload"></i></button>
+                            <button class="btn-preset-action delete" onclick="deletePreset('${preset.id}')" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
         function renderPedalboard() {
             pedalboard.innerHTML = '';
             
@@ -941,6 +1252,39 @@
             <div class="modal-actions">
                 <button class="btn-modal btn-modal-cancel" id="confirmCancel">Cancel</button>
                 <button class="btn-modal btn-modal-confirm" id="confirmOk">Delete</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Save Preset Modal -->
+    <div id="savePresetModal" class="modal-overlay">
+        <div class="modal-dialog">
+            <div class="modal-icon">
+                <i class="fa-solid fa-floppy-disk"></i>
+            </div>
+            <div class="modal-title">Save Preset</div>
+            <div class="modal-message">Save your current rig configuration as a preset.</div>
+            <div class="preset-input-row">
+                <input type="text" id="presetNameInput" class="preset-input" placeholder="Preset name..." maxlength="30">
+            </div>
+            <div class="modal-actions">
+                <button class="btn-modal btn-modal-cancel" onclick="closeSavePresetModal()">Cancel</button>
+                <button class="btn-modal btn-modal-confirm" onclick="savePreset()">Save</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Load Preset Modal -->
+    <div id="loadPresetModal" class="modal-overlay">
+        <div class="modal-dialog">
+            <div class="modal-icon">
+                <i class="fa-solid fa-folder-open"></i>
+            </div>
+            <div class="modal-title">Load Preset</div>
+            <div class="modal-message">Select a preset to load into your rig.</div>
+            <div id="presetList" class="preset-list"></div>
+            <div class="modal-actions">
+                <button class="btn-modal btn-modal-cancel" onclick="closeLoadPresetModal()">Close</button>
             </div>
         </div>
     </div>
