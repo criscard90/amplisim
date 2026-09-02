@@ -1233,8 +1233,10 @@
                 // Microfono con vincoli disabilitati per compatibilità schede USB
                 if (!micStreamNode) {
                     let stream;
+                    const errors = [];
+                    
+                    // Tentativo 1: vincoli ottimizzati per schede USB
                     try {
-                        // Primo tentativo: vincoli ottimizzati per schede USB
                         stream = await navigator.mediaDevices.getUserMedia({
                             audio: {
                                 echoCancellation: false,
@@ -1244,20 +1246,42 @@
                             }
                         });
                     } catch (err) {
-                        console.warn('Vincoli restrittivi falliti, tentativo con audio base:', err);
-                        // Fallback: audio senza vincoli (compatibilità mobile)
-                        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        errors.push(`Vincoli USB: ${err.name} - ${err.message}`);
+                        
+                        // Tentativo 2: audio base senza vincoli
+                        try {
+                            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        } catch (err2) {
+                            errors.push(`Audio base: ${err2.name} - ${err2.message}`);
+                            
+                            // Tentativo 3: solo audio, nessun vincolo
+                            try {
+                                stream = await navigator.mediaDevices.getUserMedia({
+                                    audio: { echoCancellation: false }
+                                });
+                            } catch (err3) {
+                                errors.push(`Audio semplice: ${err3.name} - ${err3.message}`);
+                                console.error('Tutti i tentativi getUserMedia falliti:', errors);
+                                alert(`Impossibile accedere al microfono.\n\nErrori:\n${errors.join('\n')}\n\nVerifica:\n1. Permesso microfono concesso\n2. HTTPS o localhost\n3. Nessun altro app usa il mic`);
+                            }
+                        }
                     }
-                    const audioTracks = stream.getAudioTracks();
-                    if (audioTracks.length > 0) {
-                        console.log(`Input attivo: ${audioTracks[0].label} (${audioTracks[0].getSettings().channelCount || 'n/d'} canali)`);
-                    }
-                    micStreamNode = audioCtx.createMediaStreamSource(stream);
-                    console.log(`micStreamNode creato: ${micStreamNode ? 'OK' : 'FALLITO'}`);
                     
-                    // Configura l'analizzatore per il livellimetro
-                    setupMicAnalyser();
-                    startMicLevelMeter();
+                    if (stream) {
+                        const audioTracks = stream.getAudioTracks();
+                        if (audioTracks.length > 0) {
+                            console.log(`Input attivo: ${audioTracks[0].label} (${audioTracks[0].getSettings().channelCount || 'n/d'} canali)`);
+                        }
+                        micStreamNode = audioCtx.createMediaStreamSource(stream);
+                        console.log(`micStreamNode creato: ${micStreamNode ? 'OK' : 'FALLITO'}`);
+                        
+                        // Configura l'analizzatore per il livellimetro
+                        setupMicAnalyser();
+                        startMicLevelMeter();
+                    } else {
+                        statusText.innerText = 'Microfono non disponibile';
+                        statusText.style.color = '#ff5252';
+                    }
                 }
                 
                 updateAudioStatus(true);
@@ -1380,6 +1404,7 @@
                 
             } catch (err) {
                 console.error(`Errore caricamento WASM per ${pedal.def.name}:`, err);
+                alert(`Errore caricamento effetto "${pedal.def.name}":\n${err.message}\n\nVerifica che i file WASM esistano in ${pedal.def.folder}`);
             }
         }
         
