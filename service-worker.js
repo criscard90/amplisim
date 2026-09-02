@@ -1,4 +1,4 @@
-const CACHE_NAME = 'amprig-v1';
+const CACHE_NAME = 'amprig-v2';
 
 // File da salvare nella cache per l'uso offline
 const ASSETS_TO_CACHE = [
